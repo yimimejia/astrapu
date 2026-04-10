@@ -125,10 +125,39 @@ export function getPrinterConfig() {
 
 function escposTicket(data) {
   const pcfg = db.configuracion_impresoras;
-  const nombre   = (pcfg.nombre_empresa || 'ASTRAPU').slice(0, 32);
-  const sub      = (pcfg.subtitulo      || 'Paquetería Interprovincial RD').slice(0, 32);
-  const tel      = pcfg.telefono ? pcfg.telefono.slice(0, 32) : '';
-  const msgFinal = (pcfg.mensaje_final  || 'Gracias por preferirnos').slice(0, 32);
+  const W   = 42;
+  const SEP = '-'.repeat(W);
+  const EQ  = '='.repeat(W);
+
+  const nombre   = (pcfg.nombre_empresa || 'ASTRAPU').slice(0, W);
+  const sub      = (pcfg.subtitulo      || 'Paquetería Interprovincial RD').slice(0, W);
+  const tel      = pcfg.telefono ? `Tel: ${pcfg.telefono}` : '';
+  const msgFinal = (pcfg.mensaje_final  || 'Gracias por preferirnos').slice(0, W);
+
+  const total    = parseFloat(data.monto) || 0;
+  const subtotal = total / 1.18;
+  const itbis    = total - subtotal;
+  const rFmt     = (n) => `RD$ ${n.toFixed(2)}`;
+  const rAlign   = (label, val) => {
+    const sp = W - label.length - val.length;
+    return label + (sp > 0 ? ' '.repeat(sp) : ' ') + val + '\n';
+  };
+  const wrap = (str, prefix = '  ') => {
+    const words = String(str || '').split(' ');
+    const lines = [];
+    let line = prefix;
+    for (const w of words) {
+      if ((line + w).length > W) { lines.push(line.trimEnd()); line = prefix + w + ' '; }
+      else { line += w + ' '; }
+    }
+    if (line.trim()) lines.push(line.trimEnd());
+    return lines.join('\n') + '\n';
+  };
+
+  const fecha = data.fecha
+    ? new Date(data.fecha).toLocaleString('es-DO', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+    : new Date().toLocaleString('es-DO', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
   return [
     '\x1B\x40',
     '\x1B\x61\x01',
@@ -137,12 +166,43 @@ function escposTicket(data) {
     '\x1B\x21\x00',
     `${sub}\n`,
     tel ? `${tel}\n` : '',
-    '--------------------------------\n',
+    `${EQ}\n`,
+    '\x1B\x61\x00',
     `GUIA: ${data.guia}\n`,
-    `CLIENTE: ${data.cliente}\n`,
-    `MONTO: RD$ ${data.monto}\n`,
-    '--------------------------------\n',
-    `${msgFinal}\n\n\n`,
+    `Fecha: ${fecha}\n`,
+    data.operador ? `Operador: ${data.operador}\n` : '',
+    `Pago: ${data.metodo_pago || 'EFECTIVO'}\n`,
+    `${SEP}\n`,
+    '\x1B\x45\x01',
+    'REMITENTE:\n',
+    '\x1B\x45\x00',
+    `  ${String(data.cliente || '').slice(0, W - 2)}\n`,
+    data.telefono_cliente ? `  Tel: ${data.telefono_cliente}\n` : '',
+    '\n',
+    '\x1B\x45\x01',
+    `DESTINO: ${String(data.destino || '-').slice(0, W - 10)}\n`,
+    '\x1B\x45\x00',
+    data.origen ? `Origen:  ${String(data.origen).slice(0, W - 9)}\n` : '',
+    `${SEP}\n`,
+    '\x1B\x45\x01',
+    'DESCRIPCION DEL PAQUETE:\n',
+    '\x1B\x45\x00',
+    wrap(data.descripcion || 'Paquete'),
+    data.color ? `  Color/Empaque: ${String(data.color).slice(0, 24)}\n` : '',
+    `  Cant: 1 Bulto\n`,
+    `${SEP}\n`,
+    rAlign('Subtotal:', rFmt(subtotal)),
+    rAlign('ITBIS (18%):', rFmt(itbis)),
+    `${SEP}\n`,
+    '\x1B\x21\x10',
+    '\x1B\x45\x01',
+    rAlign('TOTAL:', rFmt(total)),
+    '\x1B\x21\x00',
+    '\x1B\x45\x00',
+    `${EQ}\n`,
+    '\x1B\x61\x01',
+    `${msgFinal}\n`,
+    '\n\n',
     '\x1D\x56\x41',
   ].join('');
 }

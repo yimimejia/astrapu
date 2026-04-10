@@ -633,7 +633,6 @@ function wireConfiguracion() {
   const fields = {
     pcNombreEmpresa: ['pv-nombre', 'pv-etq-nombre'],
     pcSubtitulo:     ['pv-subtitulo', 'pv-etq-subtitulo'],
-    pcTelefono:      ['pv-telefono'],
     pcMensajeFinal:  ['pv-mensaje'],
   };
 
@@ -645,8 +644,12 @@ function wireConfiguracion() {
         if (el) el.textContent = val;
       }
     }
+    const tel = document.getElementById('pcTelefono')?.value || '';
     const telEl = document.getElementById('pv-telefono');
-    if (telEl) telEl.style.display = telEl.textContent.trim() ? '' : 'none';
+    if (telEl) {
+      telEl.textContent = tel ? `Tel: ${tel}` : '';
+      telEl.style.display = tel ? '' : 'none';
+    }
   };
 
   printForm.addEventListener('input', syncPreview);
@@ -718,9 +721,23 @@ function wireEnvioForm() {
         body: payload,
       });
       const pkg = result.data;
+      const _dest = db.sucursales.find((s) => s.id === payload.sucursal_destino)?.nombre || '-';
+      const _orig = db.sucursales.find((s) => s.id === getCurrentUser().sucursal_id)?.nombre || '-';
       const printResult = await printSaleDocuments(
-        { guia: pkg.guia, cliente: payload.nombre, monto: Number(payload.monto).toFixed(2) },
-        { guia: pkg.guia, destino: db.sucursales.find((s) => s.id === payload.sucursal_destino)?.nombre || '-', codigo_barras: `ASTRAPU-${pkg.guia.split('-')[1]}` },
+        {
+          guia: pkg.guia,
+          cliente: payload.nombre,
+          telefono_cliente: payload.telefono || '',
+          descripcion: payload.descripcion || '',
+          color: payload.color_empaque || '',
+          monto: Number(payload.monto).toFixed(2),
+          metodo_pago: payload.metodo_pago || 'EFECTIVO',
+          destino: _dest,
+          origen: _orig,
+          operador: getCurrentUser().username,
+          fecha: new Date().toISOString(),
+        },
+        { guia: pkg.guia, destino: _dest, codigo_barras: `ASTRAPU-${pkg.guia.split('-')[1]}` },
       );
       showAlert(`Envío registrado ${pkg.guia}. ${printResult.message}`, printResult.ok ? 'success' : 'info');
       logAudit({ modulo: 'impresion', accion: 'print_after_envio', entidad: 'paquetes', entidad_id: pkg.paquete_id, resultado: printResult.ok ? 'OK' : 'ERROR', observacion: printResult.message });
@@ -734,9 +751,23 @@ function wireEnvioForm() {
   form.querySelector('[data-action="reimprimir-ultimo"]')?.addEventListener('click', async () => {
     const last = db.paquetes[0];
     if (!last) return showAlert('No hay paquetes para reimprimir.', 'error');
+    const _lCli  = db.clientes.find((c) => c.id === last.cliente_id);
+    const _lDest = db.sucursales.find((s) => s.id === last.sucursal_destino)?.nombre || '-';
     const printResult = await printSaleDocuments(
-      { guia: last.guia, cliente: last.cliente_nombre || db.clientes.find((c) => c.id === last.cliente_id)?.nombre || '-', monto: (last.monto || 0).toFixed(2) },
-      { guia: last.guia, destino: db.sucursales.find((s) => s.id === last.sucursal_destino)?.nombre || '-', codigo_barras: last.codigo_barras },
+      {
+        guia: last.guia,
+        cliente: last.cliente_nombre || _lCli?.nombre || '-',
+        telefono_cliente: last.telefono_destinatario || _lCli?.telefono || '',
+        descripcion: last.descripcion || 'Paquete',
+        color: last.color_empaque || '',
+        monto: (last.monto || 0).toFixed(2),
+        metodo_pago: 'EFECTIVO',
+        destino: _lDest,
+        origen: db.sucursales.find((s) => s.id === last.sucursal_origen)?.nombre || '-',
+        operador: getCurrentUser().username,
+        fecha: last.created_at || new Date().toISOString(),
+      },
+      { guia: last.guia, destino: _lDest, codigo_barras: last.codigo_barras },
     );
     logAudit({ modulo: 'impresion', accion: 'reimpresion', entidad: 'paquetes', entidad_id: last.id, resultado: printResult.ok ? 'OK' : 'ERROR', observacion: printResult.message });
     showAlert(printResult.message, printResult.ok ? 'success' : 'error');
@@ -814,10 +845,23 @@ function wireScanning() {
     btn.addEventListener('click', async () => {
       const pkg = db.paquetes.find((p) => p.id === btn.dataset.id);
       if (!pkg) return;
-      const clienteNom = pkg.cliente_nombre || db.clientes.find((c) => c.id === pkg.cliente_id)?.nombre || '-';
+      const _pCli  = db.clientes.find((c) => c.id === pkg.cliente_id);
+      const clienteNom = pkg.cliente_nombre || _pCli?.nombre || '-';
       const destino = db.sucursales.find((s) => s.id === pkg.sucursal_destino)?.nombre || '-';
       const printResult = await printSaleDocuments(
-        { guia: pkg.guia, cliente: clienteNom, monto: Number(pkg.monto || 0).toFixed(2) },
+        {
+          guia: pkg.guia,
+          cliente: clienteNom,
+          telefono_cliente: pkg.telefono_destinatario || _pCli?.telefono || '',
+          descripcion: pkg.descripcion || 'Paquete',
+          color: pkg.color_empaque || '',
+          monto: Number(pkg.monto || 0).toFixed(2),
+          metodo_pago: 'EFECTIVO',
+          destino,
+          origen: db.sucursales.find((s) => s.id === pkg.sucursal_origen)?.nombre || '-',
+          operador: getCurrentUser().username,
+          fecha: pkg.created_at || new Date().toISOString(),
+        },
         { guia: pkg.guia, destino, codigo_barras: pkg.codigo_barras || pkg.guia },
       );
       logAudit({ modulo: 'impresion', accion: 'reimpresion', entidad: 'paquetes', entidad_id: pkg.id, resultado: printResult.ok ? 'OK' : 'ERROR', observacion: printResult.message });
