@@ -748,6 +748,28 @@ function wireScanning() {
     scanTimer = setTimeout(() => process(input.value), 120);
   });
 
+  refs.content.querySelectorAll('[data-action="scan-guia"]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const guia = btn.dataset.guia;
+      if (guia) { input.value = guia; process(guia); }
+    });
+  });
+
+  refs.content.querySelectorAll('[data-action="reimprimir-paquete"]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const pkg = db.paquetes.find((p) => p.id === btn.dataset.id);
+      if (!pkg) return;
+      const clienteNom = pkg.cliente_nombre || db.clientes.find((c) => c.id === pkg.cliente_id)?.nombre || '-';
+      const destino = db.sucursales.find((s) => s.id === pkg.sucursal_destino)?.nombre || '-';
+      const printResult = await printSaleDocuments(
+        { guia: pkg.guia, cliente: clienteNom, monto: Number(pkg.monto || 0).toFixed(2) },
+        { guia: pkg.guia, destino, codigo_barras: pkg.codigo_barras || pkg.guia },
+      );
+      logAudit({ modulo: 'impresion', accion: 'reimpresion', entidad: 'paquetes', entidad_id: pkg.id, resultado: printResult.ok ? 'OK' : 'ERROR', observacion: printResult.message });
+      showAlert(printResult.message, printResult.ok ? 'success' : 'info');
+    });
+  });
+
   refreshTable();
   input.focus();
 }

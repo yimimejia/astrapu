@@ -644,6 +644,44 @@ function panelNuevoEnvio(readOnly) {
 function panelEscaneo(mode) {
   const isEnviar = mode === 'enviar';
   const status = isEnviar ? 'PENDIENTE' : 'EN_TRANSITO';
+
+  let pendientesPanel = '';
+  if (isEnviar) {
+    const pendientes = db.paquetes.filter((p) => p.estado === 'PENDIENTE');
+    const rows = pendientes.map((p) => {
+      const clienteNom = p.cliente_nombre || db.clientes.find((c) => c.id === p.cliente_id)?.nombre || '-';
+      const origen = db.sucursales.find((s) => s.id === p.sucursal_origen)?.nombre || '-';
+      const destino = db.sucursales.find((s) => s.id === p.sucursal_destino)?.nombre || '-';
+      const fecha = fmtDate(p.created_at);
+      return `<tr>
+        <td><b>${p.guia}</b></td>
+        <td>${clienteNom}</td>
+        <td>${p.descripcion || '-'}</td>
+        <td>${origen}</td>
+        <td>${destino}</td>
+        <td>${money(p.monto)}</td>
+        <td>${fecha}</td>
+        <td style="white-space:nowrap">
+          <button class="btn btn-sm" data-action="scan-guia" data-guia="${p.guia}" title="Escanear este paquete para enviarlo">📤 Escanear</button>
+          <button class="btn btn-sm" data-action="reimprimir-paquete" data-id="${p.id}" title="Reimprimir ticket y etiqueta">🖨️ Reimprimir</button>
+        </td>
+      </tr>`;
+    }).join('') || `<tr><td colspan="8" style="text-align:center;color:var(--gray-400)">No hay paquetes pendientes de envío</td></tr>`;
+
+    pendientesPanel = `
+    <section class="panel" style="margin-top:0">
+      <header class="panel-header">
+        <h3>Pendientes por enviar <span style="background:var(--brand-100);color:var(--brand-700);font-size:.78rem;font-weight:700;padding:.18rem .55rem;border-radius:999px;margin-left:.4rem">${pendientes.length}</span></h3>
+      </header>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Guía</th><th>Cliente</th><th>Descripción</th><th>Origen</th><th>Destino</th><th>Monto</th><th>Fecha</th><th>Acciones</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </section>`;
+  }
+
   return `<section class="panel">
     <header class="panel-header"><h3>${VIEW_LABELS[isEnviar ? 'enviar_paquetes' : 'recibir_paquetes']}</h3></header>
     <div class="scan-zone">
@@ -652,8 +690,9 @@ function panelEscaneo(mode) {
       <p class="hint">Validación esperada: estado <b>${status}</b></p>
       <div id="scanFeedback" class="hint"></div>
     </div>
-    <div class="table-wrap" id="scanTable"></div>
-  </section>`;
+    <div class="table-wrap" id="scanTable" style="margin-top:.7rem"></div>
+  </section>
+  ${pendientesPanel}`;
 }
 
 // ─── BUSCAR PAQUETE ───────────────────────────────────────────────────────────
