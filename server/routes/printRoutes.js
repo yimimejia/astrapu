@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import crypto from 'node:crypto';
 import { get, run } from '../db/connection.js';
-import { requireAuth, requireRole, forbidReadOnlyMutations } from '../middleware/auth.js';
+import { requireAuth, forbidReadOnlyMutations } from '../middleware/auth.js';
 import { writeAudit } from '../lib/audit.js';
 import { validateBody } from '../middleware/validation.js';
 import { printerConfigSchema, qzSignSchema } from '../validation/schemas.js';
@@ -37,6 +37,29 @@ printRoutes.get('/qz/cert/download', (_req, res) => {
   res.type('text/plain').send(cert.replace(/\\n/g, '\n'));
 });
 
+// ─── FIRMA RSA-SHA512 PARA QZ TRAY ────────────────────────────────────────────
+// Este endpoint NO requiere autenticación de usuario porque QZ Tray lo llama
+// durante el protocolo de conexión (setSignaturePromise), antes de que exista
+// sesión de usuario. Es confianza a nivel de APP, protegida por la clave privada
+// del servidor (QZ_PRIVATE_KEY). El rate limiter previene abuso.
+printRoutes.post('/qz/sign', validateBody(qzSignSchema), async (req, res) => {
+  const privateKeyPem = process.env.QZ_PRIVATE_KEY;
+  if (!privateKeyPem) {
+    return sendError(res, 503, 'NO_PRIVATE_KEY', 'Clave privada QZ no configurada en el servidor');
+  }
+  try {
+    const payload = req.body.payload;
+    const signature = crypto
+      .createSign('SHA512')
+      .update(payload)
+      .sign(privateKeyPem, 'base64');
+    return sendOk(res, { signature });
+  } catch (err) {
+    console.error('[QZ Sign Error]', err.message);
+    return sendError(res, 500, 'SIGN_ERROR', 'Error al firmar: ' + err.message);
+  }
+});
+
 // ─── AUTENTICACIÓN REQUERIDA PARA EL RESTO ────────────────────────────────────
 printRoutes.use(requireAuth);
 
@@ -61,31 +84,4 @@ printRoutes.put('/config', forbidReadOnlyMutations, validateBody(printerConfigSc
   }
   await writeAudit({ req, modulo: 'impresion', accion: 'configuracion_impresoras', entidad: 'configuracion_impresoras', entidadId: req.user.sucursal_id, valorNuevo: { impresora_termica, impresora_adhesiva } });
   return sendOk(res, { updated: true });
-});
-
-// ─── FIRMA RSA-SHA512 PARA QZ TRAY ────────────────────────────────────────────
-// QZ Tray llama a setSignaturePromise con un string a firmar.
-// El frontend llama a este endpoint para obtener la firma.
-// La clave privada NUNCA sale del servidor (QZ_PRIVATE_KEY en env vars).
-// QZ Tray verifica la firma contra el certificado público que ya conoce.
-printRoutes.post('/qz/sign', requireRole('admin', 'envios', 'entrega', 'contable'), validateBody(qzSignSchema), async (req, res) => {
-  const privateKeyPem = process.env.QZ_PRIVATE_KEY;
-  if (!privateKeyPem) {
-    return sendError(res, 503, 'NO_PRIVATE_KEY', 'Clave privada QZ no configurada en el servidor');
-  }
-
-  try {
-    const payload = req.body.payload;
-    // QZ Tray requiere firma RSA-SHA512 en base64
-    const signature = crypto
-      .createSign('SHA512')
-      .update(payload)
-      .sign(privateKeyPem.replace(/\\n/g, '\n'), 'base64');
-
-    await writeAudit({ req, modulo: 'impresion', accion: 'qz_sign', entidad: 'qz_sign', entidadId: req.user.id });
-    return sendOk(res, { signature });
-  } catch (err) {
-    console.error('[QZ Sign Error]', err.message);
-    return sendError(res, 500, 'SIGN_ERROR', 'Error al firmar: ' + err.message);
-  }
 });

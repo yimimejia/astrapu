@@ -12,7 +12,6 @@
 
 import { db, persistPrinterConfigLocal, loadPrinterConfigLocal } from '../data/store.js';
 import { logAudit } from './auditService.js';
-import { getToken } from './apiClient.js';
 
 loadPrinterConfigLocal();
 
@@ -23,23 +22,19 @@ const state = {
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 
-function authHeaders() {
-  const token = getToken() || localStorage.getItem('astrapu_api_token') || '';
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
-
-// Obtiene el certificado público desde el backend (mismo en cada carga, no se regenera)
+// Obtiene el certificado X.509 desde el backend (siempre el mismo, no se regenera)
 async function fetchCertificate() {
   const res = await fetch('/api/impresion/qz/cert');
   if (!res.ok) throw new Error('No se pudo obtener el certificado QZ del servidor');
   return res.text();
 }
 
-// Firma un payload con la clave privada del servidor (RSA-SHA512)
+// Firma un payload con la clave privada del servidor (RSA-SHA512).
+// No requiere token de usuario: es autenticación a nivel de APP.
 async function signPayload(toSign) {
   const res = await fetch('/api/impresion/qz/sign', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ payload: toSign }),
   });
   const json = await res.json();
