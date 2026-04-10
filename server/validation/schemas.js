@@ -66,3 +66,39 @@ export const fiscalTrackParamsSchema = z.object({
 export const fiscalDocumentParamsSchema = z.object({
   documentId: nonEmpty('documentId'),
 });
+
+export const clienteCreateSchema = z.object({
+  telefono: z.string().trim().min(7, 'teléfono inválido').max(20),
+  nombre: nonEmpty('nombre').max(100),
+  cedula: z.string().trim().max(20).optional().or(z.literal('')),
+  direccion: z.string().trim().max(250).optional().or(z.literal('')),
+});
+
+export const clienteUpdateSchema = clienteCreateSchema.partial();
+
+export const sucursalSchema = z.object({
+  nombre: nonEmpty('nombre').max(100),
+  provincia: nonEmpty('provincia').max(100),
+});
+
+export const usuarioCreateSchema = z.object({
+  username: nonEmpty('username').max(50),
+  nombre: nonEmpty('nombre').max(100),
+  password: z.string().min(6, 'contraseña mínima 6 caracteres').max(100),
+  rol: z.enum(['admin', 'envios', 'entrega', 'contable']),
+  sucursal_id: nonEmpty('sucursal_id'),
+});
+
+export const usuarioUpdateSchema = z.object({
+  nombre: nonEmpty('nombre').max(100).optional(),
+  password: z.string().min(6).max(100).optional(),
+  rol: z.enum(['admin', 'envios', 'entrega', 'contable']).optional(),
+  sucursal_id: nonEmpty('sucursal_id').optional(),
+});
+
+export const configGeneralSchema = z.object({
+  nombre_empresa: nonEmpty('nombre_empresa').max(100),
+  rnc_empresa: z.string().trim().max(20).optional().or(z.literal('')),
+  telefono_empresa: z.string().trim().max(20).optional().or(z.literal('')),
+  direccion_empresa: z.string().trim().max(250).optional().or(z.literal('')),
+});

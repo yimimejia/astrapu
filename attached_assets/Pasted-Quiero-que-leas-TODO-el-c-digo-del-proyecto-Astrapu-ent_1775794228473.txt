@@ -1,0 +1,261 @@
+Quiero que leas TODO el código del proyecto Astrapu, entiendas cómo está funcionando hoy, detectes qué páginas están solo de adorno o incompletas, y dejes la aplicación realmente usable para pruebas internas.
+
+PROBLEMAS PRINCIPALES QUE QUIERO RESOLVER
+
+1. El selector de rol no está cambiando de verdad la aplicación.
+- Necesito que al cambiar entre ADMIN, ENVIOS, ENTREGA/RECIBE y CONTABLE:
+  - cambie el menú visible
+  - cambie la vista inicial correspondiente
+  - cambien las acciones disponibles
+  - cambie el layout si aplica
+  - se vuelva a renderizar correctamente toda la navegación
+- Esto es para pruebas mías, así que el selector de rol debe funcionar de verdad en frontend para simular cada rol, sin quedarse pegado ni mostrar el menú anterior.
+- Si hoy el selector solo cambia el texto pero no cambia el comportamiento real, arréglalo.
+
+2. Hay menús y páginas que aparecen pero no tienen botones ni acciones reales.
+- No quiero páginas de relleno.
+- Quiero que revises cada módulo visible en la app y conectes los botones, acciones, formularios, búsquedas y tablas que falten para que se puedan probar.
+- Si una página está visible en el menú, debe tener al menos una utilidad real y botones funcionales.
+- Si ya existe backend o servicio para esa acción, conéctalo.
+- Si no existe, crea la lógica mínima necesaria para que la pantalla no sea un cascarón vacío.
+
+OBJETIVO
+Dejar Astrapu coherente para pruebas manuales:
+- cambiar de rol y ver realmente cada experiencia
+- abrir cada módulo y que tenga acciones reales
+- no encontrar pantallas vacías o botones muertos
+- mantener la lógica y seguridad actual del backend
+- no romper lo ya implementado
+
+TAREA OBLIGATORIA: PRIMERO AUDITA TODO EL REPO
+Antes de cambiar cosas, quiero que leas y entiendas:
+- layout principal
+- router o sistema de vistas
+- selector de rol
+- estado global
+- servicios API
+- menús por rol
+- pantallas existentes
+- handlers de botones
+- wiring entre frontend y backend
+- endpoints ya existentes en backend
+- páginas placeholder o incompletas
+
+Después de eso, implementa los arreglos.
+
+REQUISITOS ESPECÍFICOS
+
+A. SELECTOR DE ROL
+Quiero que el selector de rol funcione así:
+- si elijo ADMIN:
+  - se muestra menú de admin
+  - se abre dashboard admin
+- si elijo ENVIOS:
+  - se muestra menú de envíos
+  - se abre nuevo envío
+- si elijo ENTREGA/RECIBE:
+  - se muestra menú de entrega/recibe
+  - se abre recibir paquetes o la vista principal de ese rol
+- si elijo CONTABLE:
+  - se muestra menú contable
+  - se abre dashboard contable
+- al cambiar de rol:
+  - se limpia el estado visual inconsistente
+  - se actualiza la navegación
+  - no deben quedar botones del rol anterior
+  - en móvil también debe cerrarse el drawer si está abierto
+- si usas estado global o local storage/session storage para persistir el rol de prueba, hazlo bien y de forma clara
+- si hay que separar “rol real autenticado” de “rol de prueba/preview”, hazlo correctamente sin romper backend
+
+B. REVISION DE CADA MENU/PANTALLA
+Revisa cada opción visible del menú y haz que tenga acciones reales.
+
+1. ADMIN
+Pantallas mínimas que deben quedar útiles:
+- Dashboard
+- Paquetes
+- Clientes
+- Sucursales
+- Usuarios
+- Cuadres
+- Auditoría
+- Reportes
+- Facturación electrónica
+- Configuración
+- Configuración de impresoras
+
+2. ENVIOS
+- Nuevo envío
+- Enviar paquetes
+- Historial de ventas
+- Cierre de caja
+- Clientes
+- Mi historial
+- Perfil
+
+3. ENTREGA/RECIBE
+- Recibir paquetes
+- Buscar paquete
+- Entregar paquete
+- Paquetes entregados
+- Mi historial
+- Perfil
+
+4. CONTABLE
+- Dashboard contable
+- Cuadres
+- Ventas
+- Paquetes
+- Auditoría
+- Reportes
+- Facturación electrónica
+- Perfil
+
+C. BOTONES Y ACCIONES QUE QUIERO VER FUNCIONANDO
+En cada pantalla visible, revisa si faltan botones y agrégalos si son necesarios.
+
+MÍNIMO ESPERADO POR MÓDULO
+
+Dashboard:
+- accesos rápidos funcionales
+- tarjetas que sí naveguen o filtren
+- resumen con datos reales si ya existen
+
+Paquetes:
+- listado
+- búsqueda
+- filtros
+- ver detalle
+- cambiar a detalle del paquete
+- historial de movimientos si existe
+
+Clientes:
+- buscar
+- crear cliente
+- ver cliente
+- editar cliente si el rol lo permite
+- historial de envíos del cliente si existe
+
+Sucursales:
+- listar
+- crear
+- editar
+- activar/desactivar
+- ver detalle
+
+Usuarios:
+- listar
+- crear
+- editar
+- activar/desactivar
+- asignar sucursal/rol si aplica
+
+Cuadres:
+- listar cierres
+- ver detalle
+- filtros
+- imprimir o exportar si ya existe esa base
+- si contable es solo lectura, respetarlo
+
+Auditoría:
+- filtros funcionales
+- búsqueda
+- paginación si ya existe
+- ver detalle expandible
+
+Reportes:
+- filtros
+- ejecución de reporte
+- tablas o tarjetas reales
+- exportación si ya existe o botón deshabilitado con explicación si no está lista
+
+Facturación electrónica:
+- que no sea una pantalla vacía
+- estado actual del módulo
+- configuración fiscal
+- documentos borrador/listado si ya existe
+- acciones conectadas a los endpoints actuales en modo preparación/mock
+
+Configuración:
+- opciones reales
+- guardar configuración si ya existe backend
+- si algo no existe todavía, no dejar botón falso; muestra estado claro
+
+Configuración de impresoras:
+- listar configuración
+- guardar
+- probar térmica
+- probar adhesiva
+- feedback visible
+
+Nuevo envío:
+- formulario funcional
+- autocompletar cliente por teléfono
+- registrar envío
+- imprimir si ya está integrado
+- mensajes claros de éxito/error
+
+Enviar paquetes:
+- escaneo funcional
+- lista de últimos escaneados
+- feedback claro
+
+Buscar/Entregar/Recibir:
+- todo el flujo debe seguir funcionando
+- revisar que no haya botones muertos
+
+Perfil / Mi historial:
+- mostrar datos útiles reales
+- no dejar una página vacía
+
+D. NO QUIERO PLACEHOLDERS DISFRAZADOS
+Reglas:
+- si una página aparece en el menú, debe tener uso real
+- si una acción todavía no puede hacerse porque falta backend, entonces:
+  - crea la base mínima si es razonable
+  - o muestra claramente “pendiente” sin dejar un botón falso que no hace nada
+- elimina o corrige botones que hoy estén visibles pero no hagan nada
+
+E. RESPETA LA SEGURIDAD
+- No rompas la seguridad ya implementada en backend
+- El contable debe seguir siendo solo lectura real
+- El selector de rol es para pruebas visuales/manuales del frontend, pero no debe abrir huecos de permisos reales en backend
+- Si el frontend hoy necesita distinguir entre “rol de prueba” y “rol real del token”, hazlo correctamente
+- No conviertas el selector de rol en un bypass inseguro para mutaciones reales no permitidas
+
+F. MÓVIL Y DESKTOP
+- Mantén el comportamiento responsive
+- En móvil, el menú debe cerrarse al cambiar de rol o navegar
+- No dejes el drawer mostrando opciones del rol anterior
+- Verifica que la interfaz no quede inconsistente entre desktop y móvil
+
+G. VALIDACIÓN FINAL OBLIGATORIA
+Después de implementar, quiero que pruebes y confirmes:
+1. Cambio de rol ADMIN -> ENVIOS -> ENTREGA/RECIBE -> CONTABLE y vuelta atrás
+2. Que el menú cambia realmente en cada caso
+3. Que la vista inicial cambia realmente en cada caso
+4. Que los botones visibles de cada módulo tengan acción
+5. Que no haya pantallas vacías visibles en el menú
+6. Que contable siga solo lectura real
+7. Que móvil siga funcionando con el menú desplegable
+8. Que frontend no quede con estado cruzado entre roles
+
+ENTREGABLES
+Quiero que respondas así:
+1. Primero dime qué archivos vas a revisar y modificar
+2. Luego haz los cambios completos
+3. Después dame una lista exacta de:
+   - módulos corregidos
+   - botones/acciones agregadas o conectadas
+   - pantallas que estaban vacías y ahora funcionan
+   - cómo resolviste el selector de rol
+4. Finalmente dime:
+   - qué quedó totalmente funcional
+   - qué quedó parcial pero usable
+   - qué todavía depende de backend futuro
+
+IMPORTANTE
+- No me des una respuesta superficial
+- No arregles solo el selector y ya
+- Lee todo el código y deja la app coherente de verdad
+- No quiero menús bonitos con páginas muertas

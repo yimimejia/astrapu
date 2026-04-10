@@ -222,3 +222,45 @@ opsRoutes.get('/failed-delivery-attempts', opsReadLimiter, async (req, res) => {
   const rows = await all('SELECT * FROM failed_delivery_attempts ORDER BY created_at DESC LIMIT 200');
   res.json({ ok: true, data: rows });
 });
+
+opsRoutes.get('/sucursales', opsReadLimiter, async (_req, res) => {
+  const rows = await all('SELECT * FROM sucursales ORDER BY nombre ASC');
+  res.json({ ok: true, data: rows });
+});
+
+opsRoutes.get('/clientes', opsReadLimiter, async (req, res) => {
+  const search = String(req.query.search || '').trim();
+  let rows;
+  if (search) {
+    rows = await all(
+      `SELECT * FROM clientes WHERE nombre LIKE ? OR telefono LIKE ? OR cedula LIKE ? ORDER BY nombre ASC LIMIT 100`,
+      [`%${search}%`, `%${search}%`, `%${search}%`],
+    );
+  } else {
+    rows = await all('SELECT * FROM clientes ORDER BY nombre ASC LIMIT 500');
+  }
+  res.json({ ok: true, data: rows });
+});
+
+opsRoutes.get('/usuarios', opsReadLimiter, async (_req, res) => {
+  const rows = await all('SELECT id, username, nombre, rol, sucursal_id, activo, created_at FROM usuarios ORDER BY rol, nombre ASC');
+  res.json({ ok: true, data: rows });
+});
+
+opsRoutes.get('/paquetes/:id/movimientos', opsReadLimiter, async (req, res) => {
+  const rows = await all(
+    `SELECT m.*, u.username FROM movimientos_paquete m LEFT JOIN usuarios u ON u.id = m.usuario_id WHERE m.paquete_id = ? ORDER BY m.created_at ASC`,
+    [req.params.id],
+  );
+  res.json({ ok: true, data: rows });
+});
+
+opsRoutes.get('/paquetes/:id', opsReadLimiter, async (req, res) => {
+  const row = await get(
+    `SELECT p.*, c.nombre as cliente_nombre, c.telefono as cliente_telefono, c.cedula as cliente_cedula
+     FROM paquetes p JOIN clientes c ON c.id = p.cliente_id WHERE p.id = ?`,
+    [req.params.id],
+  );
+  if (!row) return sendError(res, 404, 'NOT_FOUND', 'Paquete no encontrado');
+  res.json({ ok: true, data: row });
+});
