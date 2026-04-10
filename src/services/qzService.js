@@ -1,18 +1,12 @@
 import { db, persistPrinterConfigLocal, loadPrinterConfigLocal } from '../data/store.js';
 import { logAudit } from './auditService.js';
-import { getToken } from './apiClient.js';
 
 loadPrinterConfigLocal();
 
 const state = {
   connected: false,
   printers: [],
-  signingMode: 'BACKEND_SIGNING',
 };
-
-function getAuthToken() {
-  return getToken() || localStorage.getItem('astrapu_api_token') || '';
-}
 
 export async function connectQZ() {
   if (typeof window === 'undefined' || !window.qz) {
@@ -22,19 +16,11 @@ export async function connectQZ() {
   const qz = window.qz;
 
   try {
-    if (qz.security) {
-      qz.security.setCertificatePromise((resolve) => {
-        resolve(null);
-      });
-      qz.security.setSignaturePromise(() => Promise.resolve(null));
-    }
-
     if (!qz.websocket.isActive()) {
-      const isHttps = location.protocol === 'https:';
       await qz.websocket.connect({
         host: ['localhost'],
         port: { secure: [8183, 8181], insecure: [8182, 8080] },
-        usingSecure: isHttps,
+        usingSecure: location.protocol === 'https:',
         keepAlive: 60,
         retries: 1,
         delay: 0,
