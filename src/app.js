@@ -737,6 +737,14 @@ function wireScanning() {
         } else {
           await syncDataFromBackend();
           refreshTable();
+          const inputEl = document.getElementById('scanInput');
+          if (inputEl) { inputEl.value = ''; inputEl.focus(); }
+          const feedbackEl = document.getElementById('scanFeedback');
+          if (feedbackEl) {
+            feedbackEl.textContent = '✓ Paquete recibido';
+            feedbackEl.className = 'hint success';
+            setTimeout(() => { if (feedbackEl) { feedbackEl.textContent = ''; feedbackEl.className = 'hint'; } }, 1800);
+          }
         }
       } else {
         const feedbackEl = document.getElementById('scanFeedback');
