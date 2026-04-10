@@ -54,10 +54,14 @@ export async function connectQZ() {
   try {
     // Configurar certificado y firma ANTES de conectar.
     // setCertificatePromise: QZ Tray llama esto para verificar la identidad de la app.
+    // setSignatureAlgorithm: debe coincidir con el algoritmo usado en el backend (SHA512).
+    //                        Si no se declara, QZ Tray usa SHA1 por defecto y la verificación falla.
     // setSignaturePromise:   QZ Tray llama esto para verificar cada solicitud.
     qz.security.setCertificatePromise((resolve, reject) => {
       fetchCertificate().then(resolve).catch(reject);
     });
+
+    qz.security.setSignatureAlgorithm('SHA512');
 
     qz.security.setSignaturePromise((toSign) => {
       return signPayload(toSign);
