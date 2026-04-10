@@ -15,35 +15,37 @@ function getAuthToken() {
 }
 
 export async function connectQZ() {
-  if (!window.qz?.websocket) {
-    return { ok: false, error: 'La librería QZ Tray no está cargada en el navegador. Verifique la conexión a internet.' };
+  if (typeof window === 'undefined' || !window.qz) {
+    return { ok: false, error: 'QZ_LIB_NOT_LOADED' };
   }
 
+  const qz = window.qz;
+
   try {
-    if (window.qz.security) {
-      window.qz.security.setCertificatePromise((_resolve, reject) => {
-        reject('QZ Tray usando firma HMAC por backend');
+    if (qz.security) {
+      qz.security.setCertificatePromise((_resolve, reject) => {
+        reject('usando HMAC');
       });
 
-      window.qz.security.setSignaturePromise(async (toSign) => {
+      qz.security.setSignaturePromise((toSign) => {
         const token = getAuthToken();
-        const res = await fetch('/api/impresion/qz/sign', {
+        return fetch('/api/impresion/qz/sign', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
           body: JSON.stringify({ payload: toSign }),
+        }).then((res) => res.json()).then((json) => {
+          if (!json.ok) throw new Error(json.error?.message || json.error || 'Firma fallida');
+          return json.data?.signature || json.signature;
         });
-        const json = await res.json();
-        if (!res.ok) throw new Error(json.error?.message || json.error || 'No se pudo firmar mensaje QZ');
-        return json.data?.signature || json.signature;
       });
     }
 
-    if (!window.qz.websocket.isActive()) {
+    if (!qz.websocket.isActive()) {
       const isHttps = location.protocol === 'https:';
-      await window.qz.websocket.connect({
+      await qz.websocket.connect({
         host: ['localhost'],
         port: { secure: [8183, 8181], insecure: [8182, 8080] },
         usingSecure: isHttps,
@@ -53,22 +55,21 @@ export async function connectQZ() {
       });
     }
 
-    state.connected = window.qz.websocket.isActive();
+    state.connected = qz.websocket.isActive();
     if (state.connected) {
-      state.printers = await window.qz.printers.find();
+      state.printers = await qz.printers.find();
       logAudit({ modulo: 'impresion', accion: 'qz_connect', entidad: 'qz', entidad_id: 'qz', observacion: 'Conectado correctamente' });
     }
     return { ok: state.connected, printers: state.printers };
   } catch (error) {
     state.connected = false;
     const msg = String(error);
-    const isCertError = msg.includes('ERR_CERT') || msg.includes('SSL') || msg.includes('Unable to establish') || msg.includes('net::');
+    const isCertError = msg.includes('ERR_CERT') || msg.includes('SSL') || msg.includes('Unable to establish') || msg.includes('net::') || msg.includes('WebSocket') || msg.includes('ECONNREFUSED');
+    const isNotRunning = msg.includes('Unable to establish') || msg.includes('Connection refused') || msg.includes('ECONNREFUSED') || msg.includes('closed');
     logAudit({ modulo: 'impresion', accion: 'qz_connect_error', entidad: 'qz', entidad_id: 'qz', resultado: 'ERROR', observacion: msg });
     return {
       ok: false,
-      error: isCertError
-        ? 'CERT_ERROR'
-        : msg,
+      error: isNotRunning ? 'QZ_NOT_RUNNING' : isCertError ? 'CERT_ERROR' : msg,
     };
   }
 }

@@ -904,18 +904,24 @@ function wirePrinters() {
   if (!feedback) return;
 
   refs.content.querySelector('[data-action="connect-qz"]')?.addEventListener('click', async () => {
-    feedback.textContent = 'Conectando a QZ Tray...';
+    feedback.textContent = '⏳ Conectando a QZ Tray...';
     feedback.className = 'hint';
     const result = await connectQZ();
     if (result.ok) {
-      showAlert(`QZ Tray conectado — ${result.printers?.length || 0} impresoras detectadas.`, 'success');
+      showAlert(`✓ QZ Tray conectado — ${result.printers?.length || 0} impresoras detectadas.`, 'success');
       await populatePrinterSelectors();
       render();
+    } else if (result.error === 'QZ_LIB_NOT_LOADED') {
+      feedback.textContent = '✗ La librería QZ Tray no cargó correctamente. Recargue la página (F5) e intente nuevamente. Si el problema persiste, verifique que no haya extensiones del navegador bloqueando scripts.';
+      feedback.className = 'hint error';
+    } else if (result.error === 'QZ_NOT_RUNNING') {
+      feedback.textContent = '✗ QZ Tray no está en ejecución en este computador. Ábralo desde el menú de inicio / aplicaciones y vuelva a intentar.';
+      feedback.className = 'hint error';
     } else if (result.error === 'CERT_ERROR') {
-      feedback.innerHTML = '⚠️ El navegador bloqueó la conexión por certificado no confiable. Haga clic en <b>"Confiar en certificado QZ"</b>, acepte la excepción de seguridad en esa pestaña y vuelva a intentar conectar.';
+      feedback.innerHTML = '✗ El navegador bloqueó la conexión por certificado no confiable.<br>Abra <a href="https://localhost:8182" target="_blank" style="color:var(--brand-500)">https://localhost:8182</a> y <a href="https://localhost:8183" target="_blank" style="color:var(--brand-500)">https://localhost:8183</a> en nuevas pestañas, acepte la excepción de seguridad en cada una y vuelva a conectar.';
       feedback.className = 'hint error';
     } else {
-      feedback.textContent = result.error || 'No se pudo conectar. Verifique que QZ Tray esté en ejecución.';
+      feedback.textContent = `✗ ${result.error || 'No se pudo conectar. Verifique que QZ Tray esté en ejecución en este computador.'}`;
       feedback.className = 'hint error';
     }
   });
