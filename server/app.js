@@ -14,6 +14,7 @@ const rootDir = join(__dirname, '..');
 
 export function buildApp() {
   const app = express();
+  app.set('trust proxy', 1);
   app.use(express.json({ limit: '2mb' }));
 
   app.get('/api/health', (_req, res) => {

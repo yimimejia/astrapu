@@ -23,24 +23,10 @@ export async function connectQZ() {
 
   try {
     if (qz.security) {
-      qz.security.setCertificatePromise((_resolve, reject) => {
-        reject('usando HMAC');
+      qz.security.setCertificatePromise((resolve) => {
+        resolve(null);
       });
-
-      qz.security.setSignaturePromise((toSign) => {
-        const token = getAuthToken();
-        return fetch('/api/impresion/qz/sign', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-          body: JSON.stringify({ payload: toSign }),
-        }).then((res) => res.json()).then((json) => {
-          if (!json.ok) throw new Error(json.error?.message || json.error || 'Firma fallida');
-          return json.data?.signature || json.signature;
-        });
-      });
+      qz.security.setSignaturePromise(() => Promise.resolve(null));
     }
 
     if (!qz.websocket.isActive()) {
