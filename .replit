@@ -1,2 +1,8 @@
 [agent]
 expertMode = true
+
+[userenv]
+
+[userenv.shared]
+NODEJS_VERSION = "20"
+PORT = "3000"
