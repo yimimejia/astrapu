@@ -40,8 +40,13 @@ export const closeCashSchema = z.object({
 });
 
 export const printerConfigSchema = z.object({
-  impresora_termica: nonEmpty('impresora_termica').max(120),
-  impresora_adhesiva: nonEmpty('impresora_adhesiva').max(120),
+  impresora_termica: z.string().max(120).optional().default(''),
+  impresora_adhesiva: z.string().max(120).optional().default(''),
+  nombre_empresa: z.string().max(120).optional().default('ASTRAPU'),
+  subtitulo: z.string().max(200).optional().default('Paquetería Interprovincial RD'),
+  telefono_empresa: z.string().max(30).optional().default(''),
+  rnc: z.string().max(30).optional().default(''),
+  mensaje_final: z.string().max(200).optional().default('Gracias por preferirnos'),
 });
 
 export const qzSignSchema = z.object({

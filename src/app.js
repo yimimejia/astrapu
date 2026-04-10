@@ -62,6 +62,18 @@ async function syncDataFromBackend() {
         db.configuracion_fiscal = { ...db.configuracion_fiscal, ...fiscalStatusRes.data.configuracion };
       }
     }
+
+    const printerCfgRes = await api('/api/print/config').catch(() => null);
+    if (printerCfgRes?.data) {
+      const srv = printerCfgRes.data;
+      db.configuracion_impresoras.termica        = srv.impresora_termica   || db.configuracion_impresoras.termica;
+      db.configuracion_impresoras.adhesiva       = srv.impresora_adhesiva  || db.configuracion_impresoras.adhesiva;
+      db.configuracion_impresoras.nombre_empresa = srv.nombre_empresa      || db.configuracion_impresoras.nombre_empresa;
+      db.configuracion_impresoras.subtitulo      = srv.subtitulo           || db.configuracion_impresoras.subtitulo;
+      db.configuracion_impresoras.telefono       = srv.telefono_empresa    || db.configuracion_impresoras.telefono;
+      db.configuracion_impresoras.rnc            = srv.rnc                 || db.configuracion_impresoras.rnc;
+      db.configuracion_impresoras.mensaje_final  = srv.mensaje_final       || db.configuracion_impresoras.mensaje_final;
+    }
   } catch (error) {
     showAlert(`Error de sincronización: ${error.message}`, 'error');
   }
@@ -657,7 +669,7 @@ function wireConfiguracion() {
   printForm.addEventListener('input', syncPreview);
   syncPreview();
 
-  printForm.addEventListener('submit', (e) => {
+  printForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const fd = new FormData(printForm);
     const pcfg = getPrinterConfig();
@@ -666,9 +678,27 @@ function wireConfiguracion() {
     pcfg.telefono       = fd.get('telefono')        || '';
     pcfg.rnc            = fd.get('rnc')             || '';
     pcfg.mensaje_final  = fd.get('mensaje_final')   || pcfg.mensaje_final;
-    setPrinterConfig(pcfg.termica, pcfg.adhesiva);
+
     const feedback = document.getElementById('printConfigFeedback');
-    if (feedback) { feedback.textContent = '✓ Texto guardado localmente.'; feedback.className = 'hint success'; }
+    try {
+      await api('/api/print/config', {
+        method: 'PUT',
+        body: {
+          impresora_termica:  pcfg.termica  || '',
+          impresora_adhesiva: pcfg.adhesiva || '',
+          nombre_empresa:     pcfg.nombre_empresa,
+          subtitulo:          pcfg.subtitulo,
+          telefono_empresa:   pcfg.telefono,
+          rnc:                pcfg.rnc,
+          mensaje_final:      pcfg.mensaje_final,
+        },
+      });
+      setPrinterConfig(pcfg.termica, pcfg.adhesiva);
+      if (feedback) { feedback.textContent = '✓ Configuración guardada en el servidor.'; feedback.className = 'hint success'; }
+    } catch (err) {
+      setPrinterConfig(pcfg.termica, pcfg.adhesiva);
+      if (feedback) { feedback.textContent = `⚠ Guardado solo localmente: ${err.message}`; feedback.className = 'hint'; }
+    }
   });
 }
 
@@ -1033,12 +1063,29 @@ function wirePrinters() {
     render();
   });
 
-  refs.content.querySelector('[data-action="save-printers"]')?.addEventListener('click', () => {
+  refs.content.querySelector('[data-action="save-printers"]')?.addEventListener('click', async () => {
     const t = document.getElementById('printerTermica');
     const a = document.getElementById('printerAdhesiva');
     if (t && a) {
       setPrinterConfig(t.value, a.value);
-      feedback.textContent = '✓ Configuración de impresoras guardada.';
+      const pcfg = getPrinterConfig();
+      try {
+        await api('/api/print/config', {
+          method: 'PUT',
+          body: {
+            impresora_termica:  t.value || '',
+            impresora_adhesiva: a.value || '',
+            nombre_empresa:     pcfg.nombre_empresa || 'ASTRAPU',
+            subtitulo:          pcfg.subtitulo      || '',
+            telefono_empresa:   pcfg.telefono       || '',
+            rnc:                pcfg.rnc            || '',
+            mensaje_final:      pcfg.mensaje_final  || '',
+          },
+        });
+        feedback.textContent = '✓ Configuración de impresoras guardada en el servidor.';
+      } catch {
+        feedback.textContent = '✓ Guardado localmente (servidor no disponible).';
+      }
       feedback.className = 'hint success';
     }
   });

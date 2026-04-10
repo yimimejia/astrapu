@@ -74,14 +74,23 @@ printRoutes.get('/config', async (req, res) => {
 });
 
 printRoutes.put('/config', forbidReadOnlyMutations, validateBody(printerConfigSchema), async (req, res) => {
-  const { impresora_termica, impresora_adhesiva } = req.body;
+  const { impresora_termica, impresora_adhesiva, nombre_empresa, subtitulo, telefono_empresa, rnc, mensaje_final } = req.body;
   const now = new Date().toISOString();
   const cfg = await get('SELECT * FROM configuracion_impresoras WHERE sucursal_id = ?', [req.user.sucursal_id]);
   if (!cfg) {
-    await run('INSERT INTO configuracion_impresoras(id, sucursal_id, impresora_termica, impresora_adhesiva, updated_at) VALUES(?,?,?,?,?)', [`cfg-print-${req.user.sucursal_id}`, req.user.sucursal_id, impresora_termica, impresora_adhesiva, now]);
+    await run(
+      `INSERT INTO configuracion_impresoras(id, sucursal_id, impresora_termica, impresora_adhesiva, nombre_empresa, subtitulo, telefono_empresa, rnc, mensaje_final, updated_at)
+       VALUES(?,?,?,?,?,?,?,?,?,?)`,
+      [`cfg-print-${req.user.sucursal_id}`, req.user.sucursal_id, impresora_termica, impresora_adhesiva, nombre_empresa, subtitulo, telefono_empresa, rnc, mensaje_final, now],
+    );
   } else {
-    await run('UPDATE configuracion_impresoras SET impresora_termica = ?, impresora_adhesiva = ?, updated_at = ? WHERE sucursal_id = ?', [impresora_termica, impresora_adhesiva, now, req.user.sucursal_id]);
+    await run(
+      `UPDATE configuracion_impresoras
+       SET impresora_termica=?, impresora_adhesiva=?, nombre_empresa=?, subtitulo=?, telefono_empresa=?, rnc=?, mensaje_final=?, updated_at=?
+       WHERE sucursal_id=?`,
+      [impresora_termica, impresora_adhesiva, nombre_empresa, subtitulo, telefono_empresa, rnc, mensaje_final, now, req.user.sucursal_id],
+    );
   }
-  await writeAudit({ req, modulo: 'impresion', accion: 'configuracion_impresoras', entidad: 'configuracion_impresoras', entidadId: req.user.sucursal_id, valorNuevo: { impresora_termica, impresora_adhesiva } });
+  await writeAudit({ req, modulo: 'impresion', accion: 'configuracion_impresoras', entidad: 'configuracion_impresoras', entidadId: req.user.sucursal_id, valorNuevo: req.body });
   return sendOk(res, { updated: true });
 });

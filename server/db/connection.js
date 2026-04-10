@@ -66,6 +66,19 @@ export async function migrate() {
     if (!String(e.message).includes('duplicate column')) throw e;
   }
 
+  const alterStatements004 = [
+    `ALTER TABLE configuracion_impresoras ADD COLUMN nombre_empresa TEXT NOT NULL DEFAULT 'ASTRAPU'`,
+    `ALTER TABLE configuracion_impresoras ADD COLUMN subtitulo TEXT NOT NULL DEFAULT 'Paquetería Interprovincial RD'`,
+    `ALTER TABLE configuracion_impresoras ADD COLUMN telefono_empresa TEXT NOT NULL DEFAULT ''`,
+    `ALTER TABLE configuracion_impresoras ADD COLUMN rnc TEXT NOT NULL DEFAULT ''`,
+    `ALTER TABLE configuracion_impresoras ADD COLUMN mensaje_final TEXT NOT NULL DEFAULT 'Gracias por preferirnos'`,
+  ];
+  for (const stmt of alterStatements004) {
+    try { await run(stmt); } catch (e) {
+      if (!String(e.message).includes('duplicate column')) throw e;
+    }
+  }
+
   await run(
     `INSERT OR IGNORE INTO usuarios(id, username, nombre, password_hash, rol, sucursal_id)
      VALUES('u-admin','admin','Administrador General', ?, 'admin','suc-1')`,
