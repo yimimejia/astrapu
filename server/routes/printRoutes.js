@@ -6,11 +6,39 @@ import { writeAudit } from '../lib/audit.js';
 import { validateBody } from '../middleware/validation.js';
 import { printerConfigSchema, qzSignSchema } from '../validation/schemas.js';
 import { printLimiter } from '../middleware/rateLimit.js';
-import { sendOk } from '../lib/http.js';
+import { sendOk, sendError } from '../lib/http.js';
 
 export const printRoutes = Router();
 
 printRoutes.use(printLimiter);
+
+// ─── CERTIFICADO PÚBLICO QZ TRAY ─────────────────────────────────────────────
+// Este endpoint devuelve la clave pública RSA que QZ Tray usará para
+// verificar la autenticidad de la app. No requiere autenticación porque
+// QZ Tray lo llama antes de establecer la sesión.
+// La clave pública está almacenada en QZ_PUBLIC_KEY (variable de entorno).
+printRoutes.get('/qz/cert', (_req, res) => {
+  const cert = process.env.QZ_PUBLIC_KEY;
+  if (!cert) {
+    return res.status(503).type('text/plain').send('');
+  }
+  // QZ Tray espera el certificado como texto plano
+  res.type('text/plain').send(cert.replace(/\\n/g, '\n'));
+});
+
+// ─── DESCARGA DEL CERTIFICADO PARA QZ TRAY ────────────────────────────────────
+// El usuario descarga este archivo una sola vez y lo agrega en QZ Tray
+// (Site Manager → Add certificate). Después QZ Tray nunca vuelve a pedir permiso.
+printRoutes.get('/qz/cert/download', (_req, res) => {
+  const cert = process.env.QZ_PUBLIC_KEY;
+  if (!cert) {
+    return sendError(res, 503, 'NO_CERT', 'Certificado no configurado');
+  }
+  res.setHeader('Content-Disposition', 'attachment; filename="astrapu-qztray.crt"');
+  res.type('text/plain').send(cert.replace(/\\n/g, '\n'));
+});
+
+// ─── AUTENTICACIÓN REQUERIDA PARA EL RESTO ────────────────────────────────────
 printRoutes.use(requireAuth);
 
 printRoutes.get('/config', async (req, res) => {
@@ -36,11 +64,29 @@ printRoutes.put('/config', forbidReadOnlyMutations, validateBody(printerConfigSc
   return sendOk(res, { updated: true });
 });
 
-// Endpoint de signing para QZ Tray (sin exponer secreto al frontend)
+// ─── FIRMA RSA-SHA512 PARA QZ TRAY ────────────────────────────────────────────
+// QZ Tray llama a setSignaturePromise con un string a firmar.
+// El frontend llama a este endpoint para obtener la firma.
+// La clave privada NUNCA sale del servidor (QZ_PRIVATE_KEY en env vars).
+// QZ Tray verifica la firma contra el certificado público que ya conoce.
 printRoutes.post('/qz/sign', requireRole('admin', 'envios', 'entrega', 'contable'), validateBody(qzSignSchema), async (req, res) => {
-  const payload = req.body.payload;
-  const secret = process.env.QZ_SIGN_SECRET || 'astrapu-dev-qz-sign';
-  const signature = crypto.createHmac('sha256', secret).update(payload).digest('base64');
-  await writeAudit({ req, modulo: 'impresion', accion: 'qz_sign', entidad: 'qz_sign', entidadId: req.user.id });
-  return sendOk(res, { signature });
+  const privateKeyPem = process.env.QZ_PRIVATE_KEY;
+  if (!privateKeyPem) {
+    return sendError(res, 503, 'NO_PRIVATE_KEY', 'Clave privada QZ no configurada en el servidor');
+  }
+
+  try {
+    const payload = req.body.payload;
+    // QZ Tray requiere firma RSA-SHA512 en base64
+    const signature = crypto
+      .createSign('SHA512')
+      .update(payload)
+      .sign(privateKeyPem.replace(/\\n/g, '\n'), 'base64');
+
+    await writeAudit({ req, modulo: 'impresion', accion: 'qz_sign', entidad: 'qz_sign', entidadId: req.user.id });
+    return sendOk(res, { signature });
+  } catch (err) {
+    console.error('[QZ Sign Error]', err.message);
+    return sendError(res, 500, 'SIGN_ERROR', 'Error al firmar: ' + err.message);
+  }
 });

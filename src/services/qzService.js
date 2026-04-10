@@ -1,5 +1,18 @@
+// ─── QZ TRAY SERVICE ──────────────────────────────────────────────────────────
+// Gestiona la conexión con QZ Tray para impresión térmica (ESC/POS) y adhesiva (ZPL).
+//
+// FLUJO DE SEGURIDAD:
+//   1. setCertificatePromise  → el frontend pide el certificado público al backend
+//                               (GET /api/impresion/qz/cert). Siempre el mismo.
+//   2. setSignaturePromise    → QZ Tray pide una firma RSA-SHA512 de un payload.
+//                               El frontend llama al backend (POST /api/impresion/qz/sign),
+//                               que firma con la clave privada (QZ_PRIVATE_KEY, server-only).
+//   3. qz.websocket.connect() → si el certificado ya fue agregado en el Site Manager
+//                               de QZ Tray, conecta sin ningún diálogo de permisos.
+
 import { db, persistPrinterConfigLocal, loadPrinterConfigLocal } from '../data/store.js';
 import { logAudit } from './auditService.js';
+import { getToken } from './apiClient.js';
 
 loadPrinterConfigLocal();
 
@@ -7,6 +20,34 @@ const state = {
   connected: false,
   printers: [],
 };
+
+// ─── HELPERS ──────────────────────────────────────────────────────────────────
+
+function authHeaders() {
+  const token = getToken() || localStorage.getItem('astrapu_api_token') || '';
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+// Obtiene el certificado público desde el backend (mismo en cada carga, no se regenera)
+async function fetchCertificate() {
+  const res = await fetch('/api/impresion/qz/cert');
+  if (!res.ok) throw new Error('No se pudo obtener el certificado QZ del servidor');
+  return res.text();
+}
+
+// Firma un payload con la clave privada del servidor (RSA-SHA512)
+async function signPayload(toSign) {
+  const res = await fetch('/api/impresion/qz/sign', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ payload: toSign }),
+  });
+  const json = await res.json();
+  if (!res.ok || !json.ok) throw new Error(json.error?.message || json.error || 'Error de firma');
+  return json.data?.signature || json.signature;
+}
+
+// ─── CONEXIÓN ─────────────────────────────────────────────────────────────────
 
 export async function connectQZ() {
   if (typeof window === 'undefined' || !window.qz) {
@@ -16,6 +57,17 @@ export async function connectQZ() {
   const qz = window.qz;
 
   try {
+    // Configurar certificado y firma ANTES de conectar.
+    // setCertificatePromise: QZ Tray llama esto para verificar la identidad de la app.
+    // setSignaturePromise:   QZ Tray llama esto para verificar cada solicitud.
+    qz.security.setCertificatePromise((resolve, reject) => {
+      fetchCertificate().then(resolve).catch(reject);
+    });
+
+    qz.security.setSignaturePromise((toSign) => {
+      return signPayload(toSign);
+    });
+
     if (!qz.websocket.isActive()) {
       await qz.websocket.connect({
         host: ['localhost'],
@@ -30,18 +82,18 @@ export async function connectQZ() {
     state.connected = qz.websocket.isActive();
     if (state.connected) {
       state.printers = await qz.printers.find();
-      logAudit({ modulo: 'impresion', accion: 'qz_connect', entidad: 'qz', entidad_id: 'qz', observacion: 'Conectado correctamente' });
+      logAudit({ modulo: 'impresion', accion: 'qz_connect', entidad: 'qz', entidad_id: 'qz', observacion: 'Conectado con certificado RSA' });
     }
     return { ok: state.connected, printers: state.printers };
   } catch (error) {
     state.connected = false;
     const msg = String(error);
-    const isCertError = msg.includes('ERR_CERT') || msg.includes('SSL') || msg.includes('Unable to establish') || msg.includes('net::') || msg.includes('WebSocket') || msg.includes('ECONNREFUSED');
-    const isNotRunning = msg.includes('Unable to establish') || msg.includes('Connection refused') || msg.includes('ECONNREFUSED') || msg.includes('closed');
+    const isNotRunning = msg.includes('Unable to establish') || msg.includes('Connection refused') || msg.includes('ECONNREFUSED') || msg.includes('closed before') || msg.includes('WebSocket');
+    const isCertError = msg.includes('ERR_CERT') || msg.includes('SSL') || msg.includes('net::');
     logAudit({ modulo: 'impresion', accion: 'qz_connect_error', entidad: 'qz', entidad_id: 'qz', resultado: 'ERROR', observacion: msg });
     return {
       ok: false,
-      error: isNotRunning ? 'QZ_NOT_RUNNING' : isCertError ? 'CERT_ERROR' : msg,
+      error: isCertError ? 'CERT_ERROR' : isNotRunning ? 'QZ_NOT_RUNNING' : msg,
     };
   }
 }
@@ -69,6 +121,8 @@ export function setPrinterConfig(termica, adhesiva) {
 export function getPrinterConfig() {
   return db.configuracion_impresoras;
 }
+
+// ─── PLANTILLAS DE IMPRESIÓN ──────────────────────────────────────────────────
 
 function escposTicket(data) {
   const line = (txt) => txt.padEnd(32).slice(0, 32);

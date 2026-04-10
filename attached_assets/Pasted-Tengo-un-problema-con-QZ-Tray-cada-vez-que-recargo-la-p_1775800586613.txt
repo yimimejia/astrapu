@@ -1,0 +1,37 @@
+Tengo un problema con QZ Tray: cada vez que recargo la página vuelve a pedir permiso para usar la impresora y no guarda la aprobación del certificado.
+
+Quiero que corrijas la integración completa de QZ Tray para que la autorización quede guardada y no vuelva a pedir permiso en cada recarga.
+
+Haz lo siguiente:
+
+1. Revisa toda la implementación actual de QZ Tray en frontend y backend.
+2. Verifica si se está usando un certificado fijo y permanente. Si no existe, reorganiza la implementación para que siempre use el mismo certificado.
+3. Configura correctamente qz.security.setCertificatePromise para devolver siempre el mismo certificado público.
+4. Implementa qz.security.setSignaturePromise de forma segura.
+5. La firma debe salir desde el backend, usando una clave privada almacenada del lado del servidor, nunca en el frontend.
+6. Crea o corrige un endpoint backend que reciba el string a firmar desde el frontend y devuelva la firma válida para QZ Tray.
+7. Asegúrate de que el frontend use ese endpoint cada vez que QZ Tray solicite la firma.
+8. Revisa que no se esté regenerando el certificado al recargar la app.
+9. Revisa que no se esté usando una implementación insegura o temporal de desarrollo que obligue a aceptar permisos cada vez.
+10. Verifica que la app esté trabajando con una sola URL consistente y no mezcle localhost, IP, dominio temporal de Replit o dominios distintos.
+11. Si hace falta, centraliza en un solo archivo la configuración de QZ Tray para que no haya varias implementaciones distintas.
+12. Déjame comentarios claros en el código explicando dónde está:
+   - el certificado público
+   - la firma en backend
+   - la conexión de QZ Tray
+13. No rompas la impresión actual. Mantén funcionando la impresión a impresora térmica y/o adhesiva si ya existe.
+14. Al final, entrégame un resumen claro de:
+   - cuál era el problema exacto
+   - qué archivos modificaste
+   - qué quedó corregido
+   - qué debo configurar manualmente en QZ Tray si aplica
+
+Importante:
+- No uses soluciones temporales.
+- No pongas la clave privada en el frontend.
+- No uses certificados generados de forma distinta en cada carga.
+- No me dejes solo una explicación; quiero el código implementado.
+- Si detectas errores de seguridad o malas prácticas en la integración actual, corrígelos.
+
+Objetivo final:
+Después de aprobar una vez el sitio en QZ Tray, no debe volver a pedirme permiso cada vez que recargo la página.

@@ -627,18 +627,37 @@ function panelImpresoras() {
     </div>
     <div id="printFeedback" class="hint" style="margin-top:.5rem"></div>
 
-    <details style="margin-top:.85rem">
-      <summary>Guía de conexión paso a paso</summary>
-      <div style="padding:.7rem 0;font-size:.84rem;color:var(--gray-700);display:grid;gap:.55rem">
-        <div class="notice"><b>Paso 1</b> — Abra QZ Tray en su computador (el ícono aparece en la barra de tareas o en el menú superior del sistema)</div>
-        <div class="notice"><b>Paso 2 (solo primera vez en HTTPS)</b> — Confiar en el certificado de QZ:<br>
-          Abra esta URL en una nueva pestaña y acepte la excepción de seguridad:<br>
-          <a href="https://localhost:8182" target="_blank" style="color:var(--brand-500);font-weight:600">https://localhost:8182</a> → clic en "Avanzado" → "Continuar"<br>
-          Luego repita con: <a href="https://localhost:8183" target="_blank" style="color:var(--brand-500);font-weight:600">https://localhost:8183</a>
+    <details style="margin-top:.85rem" open>
+      <summary style="font-weight:600;cursor:pointer">📋 Configuración permanente (una sola vez por computador)</summary>
+      <div style="padding:.7rem 0;font-size:.84rem;color:var(--gray-700);display:grid;gap:.65rem">
+
+        <div class="notice warning">
+          <b>¿QZ Tray sigue pidiendo permiso en cada recarga?</b><br>
+          Esto se soluciona agregando el certificado de esta app en el <b>Site Manager de QZ Tray</b>. Solo se hace una vez por computador. Después nunca vuelve a preguntar.
         </div>
-        <div class="notice"><b>Paso 3</b> — Regrese aquí y haga clic en "🔌 Conectar QZ Tray"</div>
-        <div class="notice"><b>Paso 4</b> — Seleccione las impresoras en los selectores y guarde la configuración</div>
-        <p style="color:var(--gray-500)">Descarga QZ Tray: <a href="https://qz.io/download/" target="_blank" style="color:var(--brand-500)">qz.io/download</a> (versión mínima 2.1)</p>
+
+        <div class="notice">
+          <b>Paso 1</b> — Descargue el certificado de esta app:<br>
+          <a href="/api/impresion/qz/cert/download" download="astrapu-qztray.crt" class="btn" style="display:inline-block;margin-top:.4rem;font-size:.82rem">⬇️ Descargar certificado astrapu-qztray.crt</a>
+        </div>
+
+        <div class="notice">
+          <b>Paso 2</b> — Abra QZ Tray → haga clic derecho en el ícono de la barra de tareas → <b>"Site Manager"</b>
+        </div>
+
+        <div class="notice">
+          <b>Paso 3</b> — En Site Manager, haga clic en <b>"Add"</b> → seleccione el archivo <b>astrapu-qztray.crt</b> que descargó → confirme.<br>
+          <span style="font-size:.8rem;color:var(--gray-500)">Si QZ Tray pide una URL, escriba el dominio de esta app (ejemplo: <code>astrapu.replit.app</code>)</span>
+        </div>
+
+        <div class="notice">
+          <b>Paso 4</b> — Haga clic en <b>"🔌 Conectar QZ Tray"</b> arriba. A partir de ahora conecta automáticamente sin ningún diálogo.
+        </div>
+
+        <div style="border-top:1px solid var(--gray-200);padding-top:.55rem;color:var(--gray-500);font-size:.8rem">
+          QZ Tray debe estar abierto en el mismo computador donde está conectada la impresora.<br>
+          Descarga QZ Tray: <a href="https://qz.io/download/" target="_blank" style="color:var(--brand-500)">qz.io/download</a> (versión mínima 2.1)
+        </div>
       </div>
     </details>
   </section>`;
