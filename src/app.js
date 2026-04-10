@@ -2,7 +2,7 @@ import { MENUS, VIEW_LABELS } from './constants.js';
 import { db } from './data/store.js';
 import { loginAs, getCurrentUser, getRoleMenu, canEdit } from './services/authService.js';
 import { logAudit } from './services/auditService.js';
-import { connectQZ, getPrinters, setPrinterConfig, getPrinterConfig, printThermalTicket, printAdhesiveLabel } from './services/qzService.js';
+import { connectQZ, disconnectQZ, getPrinters, setPrinterConfig, getPrinterConfig, printThermalTicket, printAdhesiveLabel } from './services/qzService.js';
 import { printSaleDocuments } from './services/printService.js';
 import { renderView, menuButton, viewState } from './views.js';
 import { api } from './services/apiClient.js';
@@ -904,9 +904,25 @@ function wirePrinters() {
   if (!feedback) return;
 
   refs.content.querySelector('[data-action="connect-qz"]')?.addEventListener('click', async () => {
+    feedback.textContent = 'Conectando a QZ Tray...';
+    feedback.className = 'hint';
     const result = await connectQZ();
-    showAlert(result.ok ? 'QZ Tray conectado.' : result.error, result.ok ? 'success' : 'error');
-    await populatePrinterSelectors();
+    if (result.ok) {
+      showAlert(`QZ Tray conectado — ${result.printers?.length || 0} impresoras detectadas.`, 'success');
+      await populatePrinterSelectors();
+      render();
+    } else if (result.error === 'CERT_ERROR') {
+      feedback.innerHTML = '⚠️ El navegador bloqueó la conexión por certificado no confiable. Haga clic en <b>"Confiar en certificado QZ"</b>, acepte la excepción de seguridad en esa pestaña y vuelva a intentar conectar.';
+      feedback.className = 'hint error';
+    } else {
+      feedback.textContent = result.error || 'No se pudo conectar. Verifique que QZ Tray esté en ejecución.';
+      feedback.className = 'hint error';
+    }
+  });
+
+  refs.content.querySelector('[data-action="disconnect-qz"]')?.addEventListener('click', async () => {
+    await disconnectQZ();
+    showAlert('QZ Tray desconectado.', 'info');
     render();
   });
 
@@ -916,17 +932,24 @@ function wirePrinters() {
     if (t && a) {
       setPrinterConfig(t.value, a.value);
       feedback.textContent = '✓ Configuración de impresoras guardada.';
+      feedback.className = 'hint success';
     }
   });
 
   refs.content.querySelector('[data-action="test-termica"]')?.addEventListener('click', async () => {
-    const r = await printThermalTicket({ guia: 'TEST-THERMAL', cliente: 'PRUEBA', monto: '0.00' });
-    feedback.textContent = r.ok ? '✓ Prueba térmica enviada.' : r.error;
+    feedback.textContent = 'Enviando prueba térmica...';
+    feedback.className = 'hint';
+    const r = await printThermalTicket({ guia: 'TEST-THERMAL', cliente: 'Prueba Astrapu', monto: '0.00' });
+    feedback.textContent = r.ok ? '✓ Prueba térmica enviada correctamente.' : `✗ ${r.error}`;
+    feedback.className = `hint ${r.ok ? 'success' : 'error'}`;
   });
 
   refs.content.querySelector('[data-action="test-adhesiva"]')?.addEventListener('click', async () => {
-    const r = await printAdhesiveLabel({ guia: 'TEST-LABEL', destino: 'SUCURSAL', codigo_barras: 'TEST' });
-    feedback.textContent = r.ok ? '✓ Prueba adhesiva enviada.' : r.error;
+    feedback.textContent = 'Enviando prueba de etiqueta...';
+    feedback.className = 'hint';
+    const r = await printAdhesiveLabel({ guia: 'TEST-LABEL', destino: 'SUCURSAL TEST', codigo_barras: 'ASTRAPU-TEST' });
+    feedback.textContent = r.ok ? '✓ Prueba de etiqueta enviada correctamente.' : `✗ ${r.error}`;
+    feedback.className = `hint ${r.ok ? 'success' : 'error'}`;
   });
 
   populatePrinterSelectors();

@@ -1,5 +1,6 @@
 import { db, persistPrinterConfigLocal, loadPrinterConfigLocal } from '../data/store.js';
 import { logAudit } from './auditService.js';
+import { getToken } from './apiClient.js';
 
 loadPrinterConfigLocal();
 
@@ -9,42 +10,67 @@ const state = {
   signingMode: 'BACKEND_SIGNING',
 };
 
-export async function connectQZ() {
-  if (window.qz?.websocket) {
-    try {
-      if (window.qz.security) {
-        window.qz.security.setSignaturePromise(async (toSign) => {
-          const token = localStorage.getItem('astrapu_api_token');
-          const res = await fetch('/api/impresion/qz/sign', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              ...(token ? { Authorization: `Bearer ${token}` } : {}),
-            },
-            body: JSON.stringify({ payload: toSign }),
-          });
-          const json = await res.json();
-          if (!res.ok) throw new Error(json.error || 'No se pudo firmar mensaje QZ');
-          return json.signature;
-        });
-      }
+function getAuthToken() {
+  return getToken() || localStorage.getItem('astrapu_api_token') || '';
+}
 
-      if (!window.qz.websocket.isActive()) {
-        await window.qz.websocket.connect();
-      }
-      state.connected = window.qz.websocket.isActive();
-      if (state.connected) {
-        state.printers = await window.qz.printers.find();
-        logAudit({ modulo: 'impresion', accion: 'qz_connect', entidad: 'qz', entidad_id: 'qz', observacion: 'Conectado correctamente' });
-      }
-      return { ok: state.connected, printers: state.printers };
-    } catch (error) {
-      state.connected = false;
-      logAudit({ modulo: 'impresion', accion: 'qz_connect_error', entidad: 'qz', entidad_id: 'qz', resultado: 'ERROR', observacion: String(error) });
-      return { ok: false, error: String(error) };
-    }
+export async function connectQZ() {
+  if (!window.qz?.websocket) {
+    return { ok: false, error: 'La librería QZ Tray no está cargada en el navegador. Verifique la conexión a internet.' };
   }
-  return { ok: false, error: 'QZ Tray no disponible. Instale y ejecute QZ Tray.' };
+
+  try {
+    if (window.qz.security) {
+      window.qz.security.setCertificatePromise((_resolve, reject) => {
+        reject('QZ Tray usando firma HMAC por backend');
+      });
+
+      window.qz.security.setSignaturePromise(async (toSign) => {
+        const token = getAuthToken();
+        const res = await fetch('/api/impresion/qz/sign', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({ payload: toSign }),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error?.message || json.error || 'No se pudo firmar mensaje QZ');
+        return json.data?.signature || json.signature;
+      });
+    }
+
+    if (!window.qz.websocket.isActive()) {
+      const isHttps = location.protocol === 'https:';
+      await window.qz.websocket.connect({
+        host: ['localhost'],
+        port: { secure: [8183, 8181], insecure: [8182, 8080] },
+        usingSecure: isHttps,
+        keepAlive: 60,
+        retries: 1,
+        delay: 0,
+      });
+    }
+
+    state.connected = window.qz.websocket.isActive();
+    if (state.connected) {
+      state.printers = await window.qz.printers.find();
+      logAudit({ modulo: 'impresion', accion: 'qz_connect', entidad: 'qz', entidad_id: 'qz', observacion: 'Conectado correctamente' });
+    }
+    return { ok: state.connected, printers: state.printers };
+  } catch (error) {
+    state.connected = false;
+    const msg = String(error);
+    const isCertError = msg.includes('ERR_CERT') || msg.includes('SSL') || msg.includes('Unable to establish') || msg.includes('net::');
+    logAudit({ modulo: 'impresion', accion: 'qz_connect_error', entidad: 'qz', entidad_id: 'qz', resultado: 'ERROR', observacion: msg });
+    return {
+      ok: false,
+      error: isCertError
+        ? 'CERT_ERROR'
+        : msg,
+    };
+  }
 }
 
 export async function disconnectQZ() {
@@ -72,11 +98,35 @@ export function getPrinterConfig() {
 }
 
 function escposTicket(data) {
-  return `\x1B\x40\nASTRAPU\nGUIA: ${data.guia}\nCLIENTE: ${data.cliente}\nMONTO: RD$ ${data.monto}\n\nGracias por preferirnos\n\x1D\x56\x41`;
+  const line = (txt) => txt.padEnd(32).slice(0, 32);
+  return [
+    '\x1B\x40',
+    '\x1B\x61\x01',
+    '\x1B\x21\x30',
+    'ASTRAPU\n',
+    '\x1B\x21\x00',
+    'Paqueteria Interprovincial RD\n',
+    '--------------------------------\n',
+    `GUIA: ${data.guia}\n`,
+    `CLIENTE: ${data.cliente}\n`,
+    `MONTO: RD$ ${data.monto}\n`,
+    '--------------------------------\n',
+    'Gracias por preferirnos\n\n\n',
+    '\x1D\x56\x41',
+  ].join('');
 }
 
 function zplLabel(data) {
-  return `^XA^CF0,30^FO30,30^FDGUIA ${data.guia}^FS^FO30,80^FDDESTINO ${data.destino}^FS^FO30,130^FDBARCODE ${data.codigo_barras}^FS^XZ`;
+  return [
+    '^XA',
+    '^CF0,40',
+    `^FO40,30^FDASTRAPU^FS`,
+    `^CF0,28`,
+    `^FO40,90^FDGUIA: ${data.guia}^FS`,
+    `^FO40,130^FDDESTINO: ${data.destino}^FS`,
+    `^FO40,180^BY2^BCN,80,Y,N,N^FD${data.codigo_barras || data.guia}^FS`,
+    '^XZ',
+  ].join('\n');
 }
 
 async function rawPrint(printerName, payload) {

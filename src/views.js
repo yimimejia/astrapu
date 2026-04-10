@@ -585,21 +585,64 @@ function panelConfiguracion() {
 function panelImpresoras() {
   const qz = qzState();
   const cfg = getPrinterConfig();
+  const isHttps = typeof location !== 'undefined' && location.protocol === 'https:';
+
+  const certNotice = !qz.connected && isHttps ? `
+    <div class="notice warning" style="margin-bottom:.85rem">
+      <b>⚠️ Paso previo necesario para HTTPS:</b><br>
+      Como la app corre sobre HTTPS, el navegador requiere confiar en el certificado local de QZ Tray antes de conectar.<br>
+      <ol style="margin:.5rem 0 .5rem 1.2rem;padding:0;font-size:.84rem">
+        <li>Haga clic en <b>"Confiar en certificado QZ"</b> — se abrirá una nueva pestaña</li>
+        <li>En esa pestaña, haga clic en <b>"Avanzado"</b> y luego <b>"Continuar a localhost"</b> (o "Aceptar riesgo")</li>
+        <li>Cierre esa pestaña y regrese aquí</li>
+        <li>Haga clic en <b>"Conectar QZ Tray"</b></li>
+      </ol>
+      <button class="btn" style="margin-top:.3rem" onclick="window.open('https://localhost:8183','_blank')">🔒 Confiar en certificado QZ</button>
+    </div>` : '';
+
   return `<section class="panel">
-    <header class="panel-header"><h3>Configuración de impresoras (QZ Tray)</h3></header>
-    <div class="notice ${qz.connected ? 'success' : 'error'}">Estado QZ Tray: ${qz.connected ? '✓ Conectado' : '✗ Desconectado'} | Signing: ${qz.signingMode}</div>
+    <header class="panel-header">
+      <h3>Configuración de impresoras (QZ Tray)</h3>
+      <span class="badge ${qz.connected ? 'disponible' : 'incidencia'}">${qz.connected ? 'Conectado' : 'Desconectado'}</span>
+    </header>
+
+    ${certNotice}
+
+    <div class="notice ${qz.connected ? 'success' : 'error'}" style="margin-bottom:.85rem">
+      Estado QZ Tray: <b>${qz.connected ? '✓ Conectado' : '✗ Desconectado'}</b>
+      ${qz.connected ? `| <b>${qz.printers?.length || 0}</b> impresoras detectadas` : '| QZ Tray debe estar instalado y en ejecución'}
+    </div>
+
+    <div class="actions" style="margin-bottom:.85rem">
+      <button class="btn primary" data-action="connect-qz" type="button">${qz.connected ? '🔄 Reconectar' : '🔌 Conectar QZ Tray'}</button>
+      ${qz.connected ? `<button class="btn" data-action="disconnect-qz" type="button">Desconectar</button>` : ''}
+    </div>
+
     <form id="printerForm" class="form-grid">
-      <label>Impresora térmica<select name="termica" id="printerTermica"></select></label>
-      <label>Impresora adhesiva<select name="adhesiva" id="printerAdhesiva"></select></label>
+      <label>Impresora térmica (ticket de caja)<select name="termica" id="printerTermica"><option value="">— Seleccione —</option></select></label>
+      <label>Impresora adhesiva (etiqueta de envío)<select name="adhesiva" id="printerAdhesiva"><option value="">— Seleccione —</option></select></label>
       <div class="actions full">
-        <button class="btn" data-action="connect-qz" type="button">Conectar QZ Tray</button>
-        <button class="btn primary" data-action="save-printers" type="button">Guardar configuración</button>
-        <button class="btn" data-action="test-termica" type="button">Probar térmica</button>
-        <button class="btn" data-action="test-adhesiva" type="button">Probar adhesiva</button>
+        <button class="btn primary" data-action="save-printers" type="button" ${!qz.connected ? 'disabled' : ''}>💾 Guardar configuración</button>
+        <button class="btn" data-action="test-termica" type="button" ${!qz.connected ? 'disabled' : ''}>🖨️ Probar térmica</button>
+        <button class="btn" data-action="test-adhesiva" type="button" ${!qz.connected ? 'disabled' : ''}>🏷️ Probar adhesiva</button>
       </div>
     </form>
-    <p class="hint">Configurado: térmica=<b>${cfg.termica || 'ninguna'}</b> | adhesiva=<b>${cfg.adhesiva || 'ninguna'}</b></p>
-    <div id="printFeedback" class="hint"></div>
+
+    <div class="notice" style="margin-top:.7rem">
+      Configuración guardada: térmica=<b>${cfg.termica || 'ninguna'}</b> | adhesiva=<b>${cfg.adhesiva || 'ninguna'}</b>
+    </div>
+    <div id="printFeedback" class="hint" style="margin-top:.5rem"></div>
+
+    <details style="margin-top:.85rem">
+      <summary>¿Problemas para conectar?</summary>
+      <div style="padding:.6rem 0;font-size:.84rem;color:var(--gray-600);display:grid;gap:.4rem">
+        <p>1. Confirme que QZ Tray esté abierto (ícono en la barra de tareas / menú superior del sistema)</p>
+        <p>2. Si usa HTTPS (app publicada), primero debe confiar en el certificado: abra <a href="https://localhost:8183" target="_blank" style="color:var(--brand-500)">https://localhost:8183</a> y acepte la excepción de seguridad</p>
+        <p>3. Si usa HTTP (red local), QZ Tray conecta automáticamente sin certificado</p>
+        <p>4. QZ Tray versión mínima requerida: <b>2.1.0</b></p>
+        <p>5. Descargue QZ Tray en: <a href="https://qz.io/download/" target="_blank" style="color:var(--brand-500)">qz.io/download</a></p>
+      </div>
+    </details>
   </section>`;
 }
 
