@@ -874,7 +874,6 @@ function wireEntrega() {
       if (finalRes.ok) {
         selectedDeliveryPackage = null;
         selectedDeliverySession = null;
-        showAlert('Entrega completada.', 'success');
       }
       await render();
     }).catch((error) => {

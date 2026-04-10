@@ -48,7 +48,7 @@ export function renderView(view) {
 
   const views = {
     dashboard: () => `${commonHeader}${panelDashboard()}`,
-    dashboard_contable: () => `${commonHeader}<div class="readonly-banner">MODO CONTABLE - SOLO LECTURA TOTAL</div>${panelDashboard()}${panelCuadres()}`,
+    dashboard_contable: () => `${commonHeader}${panelDashboard()}${panelCuadres()}`,
     paquetes: () => panelPaquetes(),
     clientes: () => panelClientes(readOnly),
     sucursales: () => panelSucursales(readOnly),
