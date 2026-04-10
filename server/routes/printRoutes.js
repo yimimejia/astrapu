@@ -12,25 +12,24 @@ export const printRoutes = Router();
 
 printRoutes.use(printLimiter);
 
-// ─── CERTIFICADO PÚBLICO QZ TRAY ─────────────────────────────────────────────
-// Este endpoint devuelve la clave pública RSA que QZ Tray usará para
-// verificar la autenticidad de la app. No requiere autenticación porque
-// QZ Tray lo llama antes de establecer la sesión.
-// La clave pública está almacenada en QZ_PUBLIC_KEY (variable de entorno).
+// ─── CERTIFICADO X.509 QZ TRAY ───────────────────────────────────────────────
+// QZ Tray necesita un certificado X.509 autofirmado (BEGIN CERTIFICATE).
+// Este endpoint lo devuelve para que el frontend lo pase a setCertificatePromise.
+// No requiere auth porque QZ Tray lo llama antes de establecer sesión.
+// Almacenado en QZ_CERTIFICATE (variable de entorno del servidor).
 printRoutes.get('/qz/cert', (_req, res) => {
-  const cert = process.env.QZ_PUBLIC_KEY;
+  const cert = process.env.QZ_CERTIFICATE;
   if (!cert) {
     return res.status(503).type('text/plain').send('');
   }
-  // QZ Tray espera el certificado como texto plano
   res.type('text/plain').send(cert.replace(/\\n/g, '\n'));
 });
 
 // ─── DESCARGA DEL CERTIFICADO PARA QZ TRAY ────────────────────────────────────
-// El usuario descarga este archivo una sola vez y lo agrega en QZ Tray
-// (Site Manager → Add certificate). Después QZ Tray nunca vuelve a pedir permiso.
+// El usuario descarga este archivo .crt una sola vez y lo agrega en
+// QZ Tray → Site Manager → Add. Después QZ Tray no vuelve a pedir permiso.
 printRoutes.get('/qz/cert/download', (_req, res) => {
-  const cert = process.env.QZ_PUBLIC_KEY;
+  const cert = process.env.QZ_CERTIFICATE;
   if (!cert) {
     return sendError(res, 503, 'NO_CERT', 'Certificado no configurado');
   }
