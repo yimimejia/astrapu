@@ -1005,12 +1005,26 @@ function wireMobileMenu() {
 
 wireMobileMenu();
 
+// ─── AUTO-CONNECT QZ TRAY ────────────────────────────────────────────────────
+
+async function tryAutoConnectQZ() {
+  if (!window.qz) return;
+  try {
+    const result = await connectQZ();
+    if (result.ok) {
+      render();
+    }
+  } catch (_) {
+  }
+}
+
 // ─── INICIO ───────────────────────────────────────────────────────────────────
 
 try {
   await loginAs('admin');
   logAudit({ modulo: 'auth', accion: 'login', entidad: 'usuarios', entidad_id: getCurrentUser().id });
   render();
+  setTimeout(tryAutoConnectQZ, 1500);
 } catch (error) {
   showAlert(`No se pudo conectar al backend: ${error.message}`, 'error');
 }
