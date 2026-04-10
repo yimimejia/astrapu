@@ -59,6 +59,8 @@ export async function migrate() {
   await exec(sql);
   const sql2 = await readFile(path.join(__dirname, 'migrations', '002_eta.sql'), 'utf8');
   await exec(sql2);
+  const sql3 = await readFile(path.join(__dirname, 'migrations', '003_sucursal_telefono.sql'), 'utf8');
+  await exec(sql3);
 
   await run(
     `INSERT OR IGNORE INTO usuarios(id, username, nombre, password_hash, rol, sucursal_id)

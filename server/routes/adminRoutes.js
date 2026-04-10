@@ -41,11 +41,11 @@ adminRoutes.put('/clientes/:id', opsMutationLimiter, requireRole('admin'), forbi
 // ─── SUCURSALES ───────────────────────────────────────────────────────────────
 
 adminRoutes.post('/sucursales', opsMutationLimiter, requireRole('admin'), forbidReadOnlyMutations, validateBody(sucursalSchema), async (req, res) => {
-  const { nombre, provincia } = req.body;
+  const { nombre, provincia, telefono } = req.body;
   const id = `suc-${crypto.randomUUID().slice(0, 8)}`;
-  await run('INSERT INTO sucursales(id, nombre, provincia) VALUES(?,?,?)', [id, nombre, provincia]);
+  await run('INSERT INTO sucursales(id, nombre, provincia, telefono) VALUES(?,?,?,?)', [id, nombre, provincia, telefono || null]);
   const created = await get('SELECT * FROM sucursales WHERE id = ?', [id]);
-  await writeAudit({ req, modulo: 'sucursales', accion: 'creacion_sucursal', entidad: 'sucursales', entidadId: id, valorNuevo: { nombre, provincia } });
+  await writeAudit({ req, modulo: 'sucursales', accion: 'creacion_sucursal', entidad: 'sucursales', entidadId: id, valorNuevo: { nombre, provincia, telefono } });
   return sendOk(res, created);
 });
 
@@ -53,8 +53,8 @@ adminRoutes.put('/sucursales/:id', opsMutationLimiter, requireRole('admin'), for
   const { id } = req.params;
   const existing = await get('SELECT * FROM sucursales WHERE id = ?', [id]);
   if (!existing) return sendError(res, 404, 'NOT_FOUND', 'Sucursal no encontrada');
-  const { nombre, provincia } = req.body;
-  await run('UPDATE sucursales SET nombre=?, provincia=? WHERE id=?', [nombre, provincia, id]);
+  const { nombre, provincia, telefono } = req.body;
+  await run('UPDATE sucursales SET nombre=?, provincia=?, telefono=? WHERE id=?', [nombre, provincia, telefono || null, id]);
   const updated = await get('SELECT * FROM sucursales WHERE id = ?', [id]);
   await writeAudit({ req, modulo: 'sucursales', accion: 'edicion_sucursal', entidad: 'sucursales', entidadId: id, valorAnterior: existing, valorNuevo: updated });
   return sendOk(res, updated);

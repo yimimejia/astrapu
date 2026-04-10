@@ -79,6 +79,7 @@ export const clienteUpdateSchema = clienteCreateSchema.partial();
 export const sucursalSchema = z.object({
   nombre: nonEmpty('nombre').max(100),
   provincia: nonEmpty('provincia').max(100),
+  telefono: z.string().max(20).optional().or(z.literal('')),
 });
 
 export const usuarioCreateSchema = z.object({

@@ -268,7 +268,7 @@ function panelSucursales(readOnly) {
     const cnt = db.paquetes.filter((p) => p.sucursal_origen === s.id || p.sucursal_destino === s.id).length;
     const editBtn = !readOnly ? `<button class="btn btn-sm" data-action="editar-sucursal" data-id="${s.id}">Editar</button>` : '';
     const delBtn = !readOnly && cnt === 0 ? `<button class="btn btn-sm danger" data-action="eliminar-sucursal" data-id="${s.id}" data-nombre="${s.nombre}">Eliminar</button>` : '';
-    return `<tr><td>${s.nombre}</td><td>${s.provincia}</td><td>${cnt} paquetes</td><td style="display:flex;gap:.3rem;flex-wrap:wrap">${editBtn}${delBtn}</td></tr>`;
+    return `<tr><td>${s.nombre}</td><td>${s.provincia}</td><td>${s.telefono || '-'}</td><td>${cnt} paquetes</td><td style="display:flex;gap:.3rem;flex-wrap:wrap">${editBtn}${delBtn}</td></tr>`;
   }).join('');
 
   const formHtml = (showForm || editId) ? `
@@ -278,8 +278,29 @@ function panelSucursales(readOnly) {
         <button class="btn btn-sm" data-action="cerrar-sucursal-form">✕</button>
       </header>
       <form id="formSucursal" class="form-grid">
-        <label>Nombre<input name="nombre" required value="${editSuc?.nombre || ''}" /></label>
-        <label>Provincia<input name="provincia" required value="${editSuc?.provincia || ''}" /></label>
+        <label style="grid-column:1/-1">Nombre de la sucursal
+          <input name="nombre" required value="${editSuc?.nombre || ''}" placeholder="Ej: Santiago Centro" />
+        </label>
+        <label>Provincia
+          <input name="provincia" required list="lista-provincias" value="${editSuc?.provincia || ''}" placeholder="Seleccione o escriba..." autocomplete="off" />
+          <datalist id="lista-provincias">
+            <option>Azua</option><option>Bahoruco</option><option>Barahona</option>
+            <option>Dajabón</option><option>Distrito Nacional</option><option>Duarte</option>
+            <option>Elías Piña</option><option>El Seibo</option><option>Espaillat</option>
+            <option>Hato Mayor</option><option>Hermanas Mirabal</option><option>Independencia</option>
+            <option>La Altagracia</option><option>La Romana</option><option>La Vega</option>
+            <option>María Trinidad Sánchez</option><option>Monseñor Nouel</option>
+            <option>Monte Cristi</option><option>Monte Plata</option><option>Pedernales</option>
+            <option>Peravia</option><option>Puerto Plata</option><option>Samaná</option>
+            <option>San Cristóbal</option><option>San José de Ocoa</option><option>San Juan</option>
+            <option>San Pedro de Macorís</option><option>Sánchez Ramírez</option>
+            <option>Santiago</option><option>Santiago Rodríguez</option>
+            <option>Santo Domingo</option><option>Valverde</option>
+          </datalist>
+        </label>
+        <label>Teléfono
+          <input name="telefono" type="tel" value="${editSuc?.telefono || ''}" placeholder="809-000-0000" />
+        </label>
         <input type="hidden" name="_editId" value="${editId || ''}" />
         <div class="actions full">
           <button class="btn primary" type="submit">${editId ? 'Guardar cambios' : 'Crear sucursal'}</button>
@@ -291,7 +312,7 @@ function panelSucursales(readOnly) {
 
   return `<section class="panel">
     <header class="panel-header"><h3>Sucursales</h3>${newBtn}</header>
-    <div class="table-wrap">${table(['Nombre', 'Provincia', 'Actividad', ''], []).replace('<tbody></tbody>', `<tbody>${rows}</tbody>`)}</div>
+    <div class="table-wrap">${table(['Nombre', 'Provincia', 'Teléfono', 'Actividad', ''], []).replace('<tbody></tbody>', `<tbody>${rows}</tbody>`)}</div>
     ${formHtml}
   </section>`;
 }
