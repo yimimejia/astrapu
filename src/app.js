@@ -1265,6 +1265,44 @@ async function wireInteligencia() {
   await renderAll();
 }
 
+// ─── CAPTURA GLOBAL DE ESCÁNER (Entregar paquete) ────────────────────────────
+// Los lectores de código de barras simulan pulsaciones de teclado rápidas + Enter.
+// Si #scanEntrega está en el DOM y el foco NO está en otro input, capturamos
+// el escaneo y lo redirigimos automáticamente al campo de escaneo final.
+
+(function setupGlobalScanCapture() {
+  let buf = '';
+  let timer = null;
+
+  document.addEventListener('keydown', (e) => {
+    const scanField = document.getElementById('scanEntrega');
+    if (!scanField) { buf = ''; return; }
+
+    const active = document.activeElement;
+    const isOtherInput = active && active !== scanField &&
+      (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT');
+    if (isOtherInput) { buf = ''; return; }
+    if (active === scanField) return;
+
+    if (e.ctrlKey || e.altKey || e.metaKey) return;
+
+    if (e.key === 'Enter') {
+      if (buf.length > 2) {
+        scanField.value = buf.trim();
+        scanField.focus();
+        scanField.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+      buf = '';
+      clearTimeout(timer);
+      e.preventDefault();
+    } else if (e.key.length === 1) {
+      buf += e.key;
+      clearTimeout(timer);
+      timer = setTimeout(() => { buf = ''; }, 300);
+    }
+  });
+}());
+
 // ─── INICIO ───────────────────────────────────────────────────────────────────
 
 try {
