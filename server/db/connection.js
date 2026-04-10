@@ -72,6 +72,7 @@ export async function migrate() {
     `ALTER TABLE configuracion_impresoras ADD COLUMN telefono_empresa TEXT NOT NULL DEFAULT ''`,
     `ALTER TABLE configuracion_impresoras ADD COLUMN rnc TEXT NOT NULL DEFAULT ''`,
     `ALTER TABLE configuracion_impresoras ADD COLUMN mensaje_final TEXT NOT NULL DEFAULT 'Gracias por preferirnos'`,
+    `ALTER TABLE configuracion_impresoras ADD COLUMN adhesiva_tipo TEXT NOT NULL DEFAULT 'normal'`,
   ];
   for (const stmt of alterStatements004) {
     try { await run(stmt); } catch (e) {

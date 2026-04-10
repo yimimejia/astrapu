@@ -749,6 +749,13 @@ function panelImpresoras() {
     <form id="printerForm" class="form-grid">
       <label>Impresora térmica (ticket de caja)<select name="termica" id="printerTermica"><option value="">— Seleccione —</option></select></label>
       <label>Impresora adhesiva (etiqueta de envío)<select name="adhesiva" id="printerAdhesiva"><option value="">— Seleccione —</option></select></label>
+      <label style="grid-column:1/-1">Tipo de impresora adhesiva
+        <select id="adhesivaTipo" name="adhesiva_tipo">
+          <option value="normal" ${(cfg.adhesiva_tipo || 'normal') === 'normal' ? 'selected' : ''}>🖨️ Impresora normal (imagen — funciona en cualquier impresora)</option>
+          <option value="zpl"    ${cfg.adhesiva_tipo === 'zpl' ? 'selected' : ''}>🏷️ Zebra / impresora de etiquetas (ZPL — solo para impresoras Zebra)</option>
+        </select>
+        <small class="hint" style="margin-top:.25rem;display:block">Si tiene una impresora normal (no Zebra), seleccione "Impresora normal". Si tiene una Zebra o similar, seleccione "Zebra / etiquetas".</small>
+      </label>
       <div class="actions full">
         <button class="btn primary" data-action="save-printers" type="button" ${!qz.connected ? 'disabled' : ''}>💾 Guardar</button>
         <button class="btn" data-action="test-termica" type="button" ${!qz.connected ? 'disabled' : ''}>🖨️ Probar térmica</button>
@@ -757,7 +764,7 @@ function panelImpresoras() {
     </form>
 
     <div class="notice" style="margin-top:.85rem">
-      Guardado: térmica=<b>${cfg.termica || 'ninguna'}</b> | adhesiva=<b>${cfg.adhesiva || 'ninguna'}</b>
+      Guardado: térmica=<b>${cfg.termica || 'ninguna'}</b> | adhesiva=<b>${cfg.adhesiva || 'ninguna'}</b> | tipo adhesiva=<b>${cfg.adhesiva_tipo === 'zpl' ? 'Zebra/ZPL' : 'Impresora normal'}</b>
     </div>
     <div id="printFeedback" class="hint" style="margin-top:.5rem"></div>
 

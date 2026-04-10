@@ -47,6 +47,7 @@ export const printerConfigSchema = z.object({
   telefono_empresa: z.string().max(30).optional().default(''),
   rnc: z.string().max(30).optional().default(''),
   mensaje_final: z.string().max(200).optional().default('Gracias por preferirnos'),
+  adhesiva_tipo: z.enum(['zpl', 'normal']).optional().default('normal'),
 });
 
 export const qzSignSchema = z.object({

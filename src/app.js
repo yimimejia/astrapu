@@ -73,6 +73,7 @@ async function syncDataFromBackend() {
       db.configuracion_impresoras.telefono       = srv.telefono_empresa    || db.configuracion_impresoras.telefono;
       db.configuracion_impresoras.rnc            = srv.rnc                 || db.configuracion_impresoras.rnc;
       db.configuracion_impresoras.mensaje_final  = srv.mensaje_final       || db.configuracion_impresoras.mensaje_final;
+      if (srv.adhesiva_tipo) db.configuracion_impresoras.adhesiva_tipo = srv.adhesiva_tipo;
     }
   } catch (error) {
     showAlert(`Error de sincronización: ${error.message}`, 'error');
@@ -684,13 +685,14 @@ function wireConfiguracion() {
       await api('/api/print/config', {
         method: 'PUT',
         body: {
-          impresora_termica:  pcfg.termica  || '',
-          impresora_adhesiva: pcfg.adhesiva || '',
+          impresora_termica:  pcfg.termica       || '',
+          impresora_adhesiva: pcfg.adhesiva      || '',
           nombre_empresa:     pcfg.nombre_empresa,
           subtitulo:          pcfg.subtitulo,
           telefono_empresa:   pcfg.telefono,
           rnc:                pcfg.rnc,
           mensaje_final:      pcfg.mensaje_final,
+          adhesiva_tipo:      pcfg.adhesiva_tipo || 'normal',
         },
       });
       setPrinterConfig(pcfg.termica, pcfg.adhesiva);
@@ -1070,16 +1072,19 @@ function wirePrinters() {
       setPrinterConfig(t.value, a.value);
       const pcfg = getPrinterConfig();
       try {
+        const tipoEl = document.getElementById('adhesivaTipo');
+        if (tipoEl) { db.configuracion_impresoras.adhesiva_tipo = tipoEl.value; }
         await api('/api/print/config', {
           method: 'PUT',
           body: {
             impresora_termica:  t.value || '',
             impresora_adhesiva: a.value || '',
-            nombre_empresa:     pcfg.nombre_empresa || 'ASTRAPU',
-            subtitulo:          pcfg.subtitulo      || '',
-            telefono_empresa:   pcfg.telefono       || '',
-            rnc:                pcfg.rnc            || '',
-            mensaje_final:      pcfg.mensaje_final  || '',
+            nombre_empresa:     pcfg.nombre_empresa  || 'ASTRAPU',
+            subtitulo:          pcfg.subtitulo       || '',
+            telefono_empresa:   pcfg.telefono        || '',
+            rnc:                pcfg.rnc             || '',
+            mensaje_final:      pcfg.mensaje_final   || '',
+            adhesiva_tipo:      pcfg.adhesiva_tipo   || 'normal',
           },
         });
         feedback.textContent = '✓ Configuración de impresoras guardada en el servidor.';

@@ -74,21 +74,21 @@ printRoutes.get('/config', async (req, res) => {
 });
 
 printRoutes.put('/config', forbidReadOnlyMutations, validateBody(printerConfigSchema), async (req, res) => {
-  const { impresora_termica, impresora_adhesiva, nombre_empresa, subtitulo, telefono_empresa, rnc, mensaje_final } = req.body;
+  const { impresora_termica, impresora_adhesiva, nombre_empresa, subtitulo, telefono_empresa, rnc, mensaje_final, adhesiva_tipo } = req.body;
   const now = new Date().toISOString();
   const cfg = await get('SELECT * FROM configuracion_impresoras WHERE sucursal_id = ?', [req.user.sucursal_id]);
   if (!cfg) {
     await run(
-      `INSERT INTO configuracion_impresoras(id, sucursal_id, impresora_termica, impresora_adhesiva, nombre_empresa, subtitulo, telefono_empresa, rnc, mensaje_final, updated_at)
-       VALUES(?,?,?,?,?,?,?,?,?,?)`,
-      [`cfg-print-${req.user.sucursal_id}`, req.user.sucursal_id, impresora_termica, impresora_adhesiva, nombre_empresa, subtitulo, telefono_empresa, rnc, mensaje_final, now],
+      `INSERT INTO configuracion_impresoras(id, sucursal_id, impresora_termica, impresora_adhesiva, nombre_empresa, subtitulo, telefono_empresa, rnc, mensaje_final, adhesiva_tipo, updated_at)
+       VALUES(?,?,?,?,?,?,?,?,?,?,?)`,
+      [`cfg-print-${req.user.sucursal_id}`, req.user.sucursal_id, impresora_termica, impresora_adhesiva, nombre_empresa, subtitulo, telefono_empresa, rnc, mensaje_final, adhesiva_tipo, now],
     );
   } else {
     await run(
       `UPDATE configuracion_impresoras
-       SET impresora_termica=?, impresora_adhesiva=?, nombre_empresa=?, subtitulo=?, telefono_empresa=?, rnc=?, mensaje_final=?, updated_at=?
+       SET impresora_termica=?, impresora_adhesiva=?, nombre_empresa=?, subtitulo=?, telefono_empresa=?, rnc=?, mensaje_final=?, adhesiva_tipo=?, updated_at=?
        WHERE sucursal_id=?`,
-      [impresora_termica, impresora_adhesiva, nombre_empresa, subtitulo, telefono_empresa, rnc, mensaje_final, now, req.user.sucursal_id],
+      [impresora_termica, impresora_adhesiva, nombre_empresa, subtitulo, telefono_empresa, rnc, mensaje_final, adhesiva_tipo, now, req.user.sucursal_id],
     );
   }
   await writeAudit({ req, modulo: 'impresion', accion: 'configuracion_impresoras', entidad: 'configuracion_impresoras', entidadId: req.user.sucursal_id, valorNuevo: req.body });

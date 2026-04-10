@@ -125,9 +125,21 @@ export function getPrinterConfig() {
 
 function escposTicket(data) {
   const pcfg = db.configuracion_impresoras;
+  // W=42 for 80mm paper with normal font.
+  // Double-height mode (\x1B\x21\x10) keeps the same width but makes chars taller.
   const W   = 42;
   const SEP = '-'.repeat(W);
   const EQ  = '='.repeat(W);
+
+  // ESC/POS font modes
+  const NORMAL   = '\x1B\x21\x00';           // normal
+  const DH       = '\x1B\x21\x10';           // double height
+  const BOLD_DH  = '\x1B\x21\x18';           // bold + double height
+  const BIG      = '\x1B\x21\x38';           // bold + double width + double height (max)
+  const BOLD_ON  = '\x1B\x45\x01';
+  const BOLD_OFF = '\x1B\x45\x00';
+  const CTR      = '\x1B\x61\x01';           // center
+  const LEFT     = '\x1B\x61\x00';           // left
 
   const nombre   = (pcfg.nombre_empresa || 'ASTRAPU').slice(0, W);
   const sub      = (pcfg.subtitulo      || 'Paquetería Interprovincial RD').slice(0, W);
@@ -141,10 +153,13 @@ function escposTicket(data) {
   const subtotal = total / 1.18;
   const itbis    = total - subtotal;
   const rFmt     = (n) => `RD$ ${n.toFixed(2)}`;
-  const rAlign   = (label, val) => {
+
+  // Right-aligned row — same width as normal font (DH doesn't change width)
+  const rAlign = (label, val) => {
     const sp = W - label.length - val.length;
     return label + (sp > 0 ? ' '.repeat(sp) : ' ') + val + '\n';
   };
+
   const wrap = (str, prefix = '  ') => {
     const words = String(str || '').split(' ');
     const lines = [];
@@ -162,52 +177,99 @@ function escposTicket(data) {
     : new Date().toLocaleString('es-DO', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
   return [
-    '\x1B\x40',
-    '\x1B\x61\x01',
-    '\x1B\x21\x38',
-    `${nombre}\n`,
-    '\x1B\x21\x00',
-    `${sub}\n`,
-    telRnc ? `${telRnc}\n` : '',
+    '\x1B\x40',                              // initialize printer
+    CTR, BIG, `${nombre}\n`,                 // company name — max size, centered
+    DH,  `${sub}\n`,                         // subtitle — double height, centered
+    NORMAL, telRnc ? `${telRnc}\n` : '',     // tel/RNC — normal, centered
     `${EQ}\n`,
-    '\x1B\x61\x00',
-    `GUIA: ${data.guia}\n`,
-    `Fecha: ${fecha}\n`,
+    LEFT,
+    DH, `GUIA: ${data.guia}\n`,              // guide number — double height
+    NORMAL, `Fecha: ${fecha}\n`,
     data.operador ? `Operador: ${data.operador}\n` : '',
     `Pago: ${data.metodo_pago || 'EFECTIVO'}\n`,
     `${SEP}\n`,
-    '\x1B\x45\x01',
-    'REMITENTE:\n',
-    '\x1B\x45\x00',
-    `  ${String(data.cliente || '').slice(0, W - 2)}\n`,
-    data.telefono_cliente ? `  Tel: ${data.telefono_cliente}\n` : '',
+    BOLD_DH, 'REMITENTE:\n',                 // section header — bold + double height
+    DH, `  ${String(data.cliente || '').slice(0, W - 2)}\n`,
+    data.telefono_cliente ? DH + `  Tel: ${data.telefono_cliente}\n` : '',
     '\n',
-    '\x1B\x45\x01',
-    `DESTINO: ${String(data.destino || '-').slice(0, W - 10)}\n`,
-    '\x1B\x45\x00',
-    data.origen ? `Origen:  ${String(data.origen).slice(0, W - 9)}\n` : '',
+    BOLD_DH, `DESTINO:\n`,
+    DH, `  ${String(data.destino || '-').slice(0, W - 2)}\n`,
+    data.origen ? NORMAL + `  Origen: ${String(data.origen).slice(0, W - 10)}\n` : '',
     `${SEP}\n`,
-    '\x1B\x45\x01',
-    'DESCRIPCION DEL PAQUETE:\n',
-    '\x1B\x45\x00',
-    wrap(data.descripcion || 'Paquete'),
+    BOLD_DH, 'DESCRIPCION DEL PAQUETE:\n',
+    DH, wrap(data.descripcion || 'Paquete'),
     data.color ? `  Color/Empaque: ${String(data.color).slice(0, 24)}\n` : '',
     `  Cant: 1 Bulto\n`,
     `${SEP}\n`,
+    NORMAL,
     rAlign('Subtotal:', rFmt(subtotal)),
     rAlign('ITBIS (18%):', rFmt(itbis)),
     `${SEP}\n`,
-    '\x1B\x21\x10',
-    '\x1B\x45\x01',
+    BIG, BOLD_ON,
     rAlign('TOTAL:', rFmt(total)),
-    '\x1B\x21\x00',
-    '\x1B\x45\x00',
+    NORMAL, BOLD_OFF,
     `${EQ}\n`,
-    '\x1B\x61\x01',
-    `${msgFinal}\n`,
+    CTR, DH, `${msgFinal}\n`,
+    NORMAL,
     '\n\n',
-    '\x1D\x56\x41',
+    '\x1D\x56\x41',                          // cut paper
   ].join('');
+}
+
+function htmlLabel(data) {
+  const pcfg   = db.configuracion_impresoras;
+  const nombre = pcfg.nombre_empresa || 'ASTRAPU';
+  const sub    = pcfg.subtitulo      || 'Paquetería Interprovincial RD';
+  const tel    = pcfg.telefono ? `Tel: ${pcfg.telefono}` : '';
+  const rnc    = pcfg.rnc      ? `RNC: ${pcfg.rnc}`      : '';
+  const guia   = data.guia   || '';
+  const dest   = data.destino || '-';
+  const orig   = data.origen  || '';
+  const barcode = data.codigo_barras || data.guia || '';
+
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:Arial,sans-serif;width:148mm;height:100mm;padding:4mm;
+       border:1px solid #000;background:#fff;display:flex;flex-direction:column;gap:2mm}
+  .top{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:1px solid #000;padding-bottom:2mm}
+  .brand{flex:1}
+  .brand h1{font-size:18pt;font-weight:900;line-height:1}
+  .brand p{font-size:7pt;color:#444}
+  .qr{width:22mm;height:22mm;display:flex;align-items:center;justify-content:center;border:1px dashed #ccc;font-size:6pt;color:#999;text-align:center}
+  .mid{display:grid;grid-template-columns:1fr 1fr;gap:2mm;flex:1}
+  .field label{font-size:6pt;font-weight:700;text-transform:uppercase;color:#666;display:block}
+  .field span{font-size:10pt;font-weight:700;display:block;line-height:1.2}
+  .field.dest span{font-size:13pt;font-weight:900;color:#000}
+  .bar{text-align:center;border-top:1px solid #000;padding-top:1.5mm}
+  .bartext{font-size:8pt;font-weight:700;letter-spacing:1px;font-family:monospace}
+  .guia-big{font-size:14pt;font-weight:900;letter-spacing:1px}
+</style>
+</head><body>
+  <div class="top">
+    <div class="brand">
+      <h1>${nombre}</h1>
+      <p>${sub}</p>
+      ${tel ? `<p>${tel}${rnc ? '  ' + rnc : ''}</p>` : (rnc ? `<p>${rnc}</p>` : '')}
+    </div>
+    <div class="guia-big">${guia}</div>
+  </div>
+  <div class="mid">
+    <div class="field dest">
+      <label>Destino</label>
+      <span>${dest}</span>
+    </div>
+    <div class="field">
+      <label>Origen</label>
+      <span>${orig || '—'}</span>
+    </div>
+  </div>
+  <div class="bar">
+    <div class="bartext">|||||||||||||||||||||||||||||||||||||||||||||||</div>
+    <div style="font-size:7pt;letter-spacing:1.5px;font-family:monospace">${barcode}</div>
+  </div>
+</body></html>`;
 }
 
 function zplLabel(data) {
@@ -240,6 +302,22 @@ async function rawPrint(printerName, payload) {
   }
 }
 
+async function pixelPrint(printerName, htmlContent) {
+  if (!state.connected || !window.qz) return { ok: false, error: 'QZ no conectado' };
+  try {
+    const config = window.qz.configs.create(printerName, {
+      units: 'mm',
+      size: { width: 148, height: 105 },
+      margins: { top: 0, right: 0, bottom: 0, left: 0 },
+      colorType: 'blackwhite',
+    });
+    await window.qz.print(config, [{ type: 'pixel', format: 'html', flavor: 'plain', data: htmlContent }]);
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: String(error) };
+  }
+}
+
 export async function printThermalTicket(data) {
   const printer = db.configuracion_impresoras.termica;
   if (!printer) return { ok: false, error: 'Impresora térmica no configurada.' };
@@ -249,9 +327,13 @@ export async function printThermalTicket(data) {
 }
 
 export async function printAdhesiveLabel(data) {
-  const printer = db.configuracion_impresoras.adhesiva;
+  const cfg     = db.configuracion_impresoras;
+  const printer = cfg.adhesiva;
   if (!printer) return { ok: false, error: 'Impresora adhesiva no configurada.' };
-  const result = await rawPrint(printer, zplLabel(data));
+  const tipo = cfg.adhesiva_tipo || 'normal';
+  const result = tipo === 'zpl'
+    ? await rawPrint(printer, zplLabel(data))
+    : await pixelPrint(printer, htmlLabel(data));
   logAudit({ modulo: 'impresion', accion: 'impresion_etiqueta', entidad: 'historial_impresion', entidad_id: data.guia, resultado: result.ok ? 'OK' : 'ERROR', observacion: result.error || '' });
   return result;
 }
