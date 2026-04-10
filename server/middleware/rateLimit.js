@@ -20,7 +20,7 @@ function createLimiter({ windowMs, max }) {
   });
 }
 
-export const loginLimiter = createLimiter({ windowMs: 15 * 60 * 1000, max: 5 });
+export const loginLimiter = createLimiter({ windowMs: 15 * 60 * 1000, max: 30 });
 export const logoutLimiter = createLimiter({ windowMs: 15 * 60 * 1000, max: 20 });
 
 export const opsSearchLimiter = createLimiter({ windowMs: 60 * 1000, max: 300 });

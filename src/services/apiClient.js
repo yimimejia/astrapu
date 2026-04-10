@@ -7,6 +7,29 @@ const ROLE_CREDS = {
 
 let token = null;
 
+function tokenKey(role) { return `astrapu_token_${role}`; }
+function userKey(role) { return `astrapu_user_${role}`; }
+
+function isTokenValid(t) {
+  if (!t) return false;
+  try {
+    const payload = JSON.parse(atob(t.split('.')[1]));
+    return payload.exp * 1000 > Date.now() + 60_000;
+  } catch { return false; }
+}
+
+function loadCachedSession(role) {
+  const t = sessionStorage.getItem(tokenKey(role));
+  const u = sessionStorage.getItem(userKey(role));
+  if (isTokenValid(t) && u) return { token: t, user: JSON.parse(u) };
+  return null;
+}
+
+function saveSession(role, t, user) {
+  sessionStorage.setItem(tokenKey(role), t);
+  sessionStorage.setItem(userKey(role), JSON.stringify(user));
+}
+
 function extractApiError(json, fallback = 'Error API') {
   if (!json) return fallback;
   if (typeof json.error === 'string') return json.error;
@@ -15,6 +38,12 @@ function extractApiError(json, fallback = 'Error API') {
 }
 
 export async function loginByRole(role) {
+  const cached = loadCachedSession(role);
+  if (cached) {
+    token = cached.token;
+    return cached.user;
+  }
+
   const creds = ROLE_CREDS[role];
   const res = await fetch('/api/auth/login', {
     method: 'POST',
@@ -24,13 +53,11 @@ export async function loginByRole(role) {
   const json = await res.json();
   if (!res.ok) throw new Error(extractApiError(json, 'No se pudo autenticar'));
   token = json.data.token;
-  localStorage.setItem('astrapu_api_token', token);
+  saveSession(role, token, json.data.user);
   return json.data.user;
 }
 
-export function getToken() {
-  return token;
-}
+export function getToken() { return token; }
 
 export async function api(path, { method = 'GET', body, headers = {} } = {}) {
   const res = await fetch(path, {

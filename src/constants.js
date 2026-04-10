@@ -52,3 +52,10 @@ export const VIEW_LABELS = {
   recibir_paquetes: 'Recibir paquetes', buscar_paquete: 'Buscar paquete', entregar_paquete: 'Entregar paquete', paquetes_entregados: 'Paquetes entregados',
   dashboard_contable: 'Dashboard contable', ventas: 'Ventas',
 };
+
+export const VIEW_ICONS = {
+  dashboard: '◈', paquetes: '📦', clientes: '👥', sucursales: '🏢', usuarios: '👤', cuadres: '🧾', auditoria: '🔍', reportes: '📊', facturacion: '🧾', configuracion: '⚙️', impresoras: '🖨️',
+  nuevo_envio: '＋', enviar_paquetes: '🚚', historial_ventas: '📋', cierre_caja: '💰', mi_historial: '📋', perfil: '👤',
+  recibir_paquetes: '📥', buscar_paquete: '🔎', entregar_paquete: '✅', paquetes_entregados: '📦',
+  dashboard_contable: '◈', ventas: '💳',
+};

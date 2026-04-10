@@ -132,6 +132,58 @@ function wireViewInteractions() {
   wireFiscalPanel();
   wireConfiguracion();
   wireVentasPanel();
+  wireReportesPanel();
+}
+
+// ─── REPORTES ─────────────────────────────────────────────────────────────────
+
+function wireReportesPanel() {
+  refs.content.querySelector('[data-action="exportar-csv"]')?.addEventListener('click', () => {
+    const ahora = new Date().toISOString().slice(0, 10);
+    const filename = `astrapu-reporte-${ahora}.csv`;
+
+    const sections = [];
+
+    sections.push('=== PAQUETES ===');
+    sections.push(['Guía', 'Cliente', 'Estado', 'Origen', 'Destino', 'Monto', 'Fecha'].join(','));
+    db.paquetes.forEach((p) => {
+      const origen = db.sucursales.find((s) => s.id === p.sucursal_origen)?.nombre || p.sucursal_origen;
+      const destino = db.sucursales.find((s) => s.id === p.sucursal_destino)?.nombre || p.sucursal_destino;
+      const cliente = db.clientes.find((c) => c.id === p.cliente_id)?.nombre || p.cliente_nombre || '-';
+      sections.push([p.guia, `"${cliente}"`, p.estado, `"${origen}"`, `"${destino}"`, p.monto || '0', String(p.created_at || '').slice(0, 16)].join(','));
+    });
+
+    sections.push('');
+    sections.push('=== VENTAS ===');
+    sections.push(['Guía', 'Cliente', 'Monto', 'Método', 'Fecha', 'En cierre'].join(','));
+    db.ventas.forEach((v) => {
+      sections.push([v.guia, `"${v.cliente_nombre || v.cliente || '-'}"`, v.monto || '0', v.metodo_pago, String(v.fecha_hora || v.created_at || '').slice(0, 16), v.cierre_id ? 'Sí' : 'No'].join(','));
+    });
+
+    sections.push('');
+    sections.push('=== CLIENTES ===');
+    sections.push(['Nombre', 'Teléfono', 'Cédula', 'Email'].join(','));
+    db.clientes.forEach((c) => {
+      sections.push([`"${c.nombre}"`, c.telefono || '-', c.cedula || '-', c.email || '-'].join(','));
+    });
+
+    sections.push('');
+    sections.push('=== CIERRES DE CAJA ===');
+    sections.push(['ID', 'Usuario', 'Total', 'Fecha'].join(','));
+    db.cierres_caja.forEach((cc) => {
+      const usr = db.usuarios.find((u) => u.id === cc.usuario_id)?.username || '-';
+      sections.push([cc.id, usr, cc.total_monto || '0', String(cc.created_at || '').slice(0, 16)].join(','));
+    });
+
+    const blob = new Blob([sections.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+    showAlert(`Reporte exportado: ${filename}`, 'success');
+  });
 }
 
 // ─── DASHBOARD ────────────────────────────────────────────────────────────────

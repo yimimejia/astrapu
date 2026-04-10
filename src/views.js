@@ -1,4 +1,4 @@
-import { VIEW_LABELS, PACKAGE_STATUS, MENUS } from './constants.js';
+import { VIEW_LABELS, VIEW_ICONS, PACKAGE_STATUS, MENUS } from './constants.js';
 import { db } from './data/store.js';
 import { getCurrentUser, canEdit } from './services/authService.js';
 import { resumenPendientes } from './services/salesService.js';
@@ -6,7 +6,8 @@ import { buildReports } from './services/reportsService.js';
 import { qzState, getPrinterConfig } from './services/qzService.js';
 
 export function menuButton(view, active) {
-  return `<button class="menu-item ${active ? 'active' : ''}" data-view="${view}">${VIEW_LABELS[view]}</button>`;
+  const icon = VIEW_ICONS[view] || '';
+  return `<button class="menu-item ${active ? 'active' : ''}" data-view="${view}"><span style="font-size:.9em;opacity:.75;flex-shrink:0">${icon}</span>${VIEW_LABELS[view]}</button>`;
 }
 
 const badge = (status) => `<span class="badge ${(status || '').toLowerCase()}">${(status || '').replace('_', ' ')}</span>`;
@@ -465,7 +466,7 @@ function panelReportes() {
   return `<section class="panel">
     <header class="panel-header">
       <h3>Reportes y analítica</h3>
-      <button class="btn" disabled title="Exportación disponible próximamente">⬇ Exportar (pendiente)</button>
+      <button class="btn primary" data-action="exportar-csv">⬇ Exportar CSV</button>
     </header>
     <div class="kpis">
       <article class="kpi"><p>Paquetes registrados</p><h3>${db.paquetes.length}</h3></article>
@@ -535,9 +536,9 @@ function panelFiscal(readOnly) {
     <header class="panel-header"><h3>Facturación electrónica (modo preparación)</h3></header>
     <div class="notice warning">MODO PREPARACIÓN: integración DGII desacoplada, lista para conectar. Estado: <b>${cfg.estado_configuracion || 'incompleta'}</b></div>
     <div class="detail-grid">
-      <div><b>RNC:</b> ${cfg.rnc || 'No configurado'}</div>
-      <div><b>Razón social:</b> ${cfg.razon_social || 'No configurada'}</div>
-      <div><b>Ambiente:</b> ${cfg.ambiente || 'PREPARACION'}</div>
+      <div><span>RNC</span><span>${cfg.rnc || 'No configurado'}</span></div>
+      <div><span>Razón social</span><span>${cfg.razon_social || 'No configurada'}</span></div>
+      <div><span>Ambiente</span><span>${cfg.ambiente || 'PREPARACION'}</span></div>
     </div>
     ${configForm}
     <h4>Documentos fiscales</h4>
@@ -568,12 +569,12 @@ function panelConfiguracion() {
     <section class="panel panel-secondary" style="margin-top:1rem">
       <header class="panel-header"><h3>Estado del sistema</h3></header>
       <div class="detail-grid">
-        <div><b>Usuarios registrados:</b> ${db.usuarios.length}</div>
-        <div><b>Sucursales:</b> ${db.sucursales.length}</div>
-        <div><b>Paquetes en sistema:</b> ${db.paquetes.length}</div>
-        <div><b>Configuración fiscal:</b> ${cfg.estado_configuracion || 'incompleta'}</div>
-        <div><b>Ambiente fiscal:</b> ${cfg.ambiente || 'PREPARACION'}</div>
-        <div><b>Clientes registrados:</b> ${db.clientes.length}</div>
+        <div><span>Usuarios registrados</span><span>${db.usuarios.length}</span></div>
+        <div><span>Sucursales</span><span>${db.sucursales.length}</span></div>
+        <div><span>Paquetes en sistema</span><span>${db.paquetes.length}</span></div>
+        <div><span>Configuración fiscal</span><span>${cfg.estado_configuracion || 'incompleta'}</span></div>
+        <div><span>Ambiente fiscal</span><span>${cfg.ambiente || 'PREPARACION'}</span></div>
+        <div><span>Clientes registrados</span><span>${db.clientes.length}</span></div>
       </div>
     </section>
   </section>`;
