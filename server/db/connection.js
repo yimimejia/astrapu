@@ -57,6 +57,8 @@ function hashPassword(password) {
 export async function migrate() {
   const sql = await readFile(path.join(__dirname, 'migrations', '001_init.sql'), 'utf8');
   await exec(sql);
+  const sql2 = await readFile(path.join(__dirname, 'migrations', '002_eta.sql'), 'utf8');
+  await exec(sql2);
 
   await run(
     `INSERT OR IGNORE INTO usuarios(id, username, nombre, password_hash, rol, sucursal_id)

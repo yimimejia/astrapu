@@ -6,7 +6,8 @@ Sistema integral para la gestión de envíos de paquetes entre sucursales en la 
 ## Stack técnico
 - **Backend**: Node.js + Express.js (ES Modules), SQLite (via `sqlite3`), JWT (8h), Zod (validación), express-rate-limit
 - **Frontend**: Vanilla JS ES Modules (sin framework), QZ Tray (impresión), Google Fonts (Inter)
-- **Base de datos**: SQLite en `astrapu.sqlite`, migración en `server/db/migrations/001_init.sql`
+- **Base de datos**: SQLite en `astrapu.sqlite`, migraciones en `server/db/migrations/001_init.sql` + `002_eta.sql`
+- **IA**: `@google/genai` con Gemini 2.5 Flash vía Replit integration (`AI_INTEGRATIONS_GEMINI_BASE_URL` + `AI_INTEGRATIONS_GEMINI_API_KEY`)
 - **Puerto**: 5000 (forzado via `PORT=5000 node server/index.js`)
 
 ## Roles y credenciales

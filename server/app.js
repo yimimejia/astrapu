@@ -7,6 +7,7 @@ import { auditRoutes } from './routes/auditRoutes.js';
 import { printRoutes } from './routes/printRoutes.js';
 import { fiscalRoutes } from './routes/fiscalRoutes.js';
 import { adminRoutes } from './routes/adminRoutes.js';
+import { etaRoutes } from './routes/etaRoutes.js';
 import { sendError } from './lib/http.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -27,6 +28,7 @@ export function buildApp() {
   app.use('/api/impresion', printRoutes);
   app.use('/api/fiscal', fiscalRoutes);
   app.use('/api/admin', adminRoutes);
+  app.use('/api/eta', etaRoutes);
 
   app.use(express.static(rootDir));
 

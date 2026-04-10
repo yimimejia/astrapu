@@ -68,6 +68,7 @@ export function renderView(view) {
     perfil: () => panelPerfil(user),
 
     recibir_paquetes: () => panelEscaneo('recibir'),
+    inteligencia: () => panelInteligencia(),
     buscar_paquete: () => panelBuscar(),
     entregar_paquete: () => panelEntregar(),
     paquetes_entregados: () => panelEntregados(),
@@ -729,32 +730,41 @@ function panelEscaneo(mode) {
   const isEnviar = mode === 'enviar';
   const status = isEnviar ? 'PENDIENTE' : 'EN_TRANSITO';
 
-  // ── Despachados en esta sesión (solo modo enviar) ──────────────────────────
+  // ── Despachados de esta sucursal (EN_TRANSITO desde esta sucursal) ──────────
   let despachadosPanel = '';
-  if (isEnviar && viewState.escaneo.despachados.length > 0) {
-    const rowsD = viewState.escaneo.despachados.map((d) => {
-      return `<tr>
-        <td>${d.hora}</td>
-        <td><b>${d.guia}</b></td>
-        <td>${d.cliente}</td>
-        <td>${d.descripcion}</td>
-        <td>${d.destino}</td>
-        <td>${money(d.monto)}</td>
-        <td><span class="badge en_transito">EN TRÁNSITO</span></td>
-      </tr>`;
-    }).join('');
-    despachadosPanel = `
-    <section class="panel" style="margin-top:0;border-left:3px solid var(--brand-500)">
-      <header class="panel-header">
-        <h3>Despachados en esta sesión <span style="background:var(--brand-100);color:var(--brand-700);font-size:.78rem;font-weight:700;padding:.18rem .55rem;border-radius:999px;margin-left:.4rem">${viewState.escaneo.despachados.length}</span></h3>
-      </header>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Hora</th><th>Guía</th><th>Cliente</th><th>Descripción</th><th>Destino</th><th>Monto</th><th>Estado</th></tr></thead>
-          <tbody>${rowsD}</tbody>
-        </table>
-      </div>
-    </section>`;
+  if (isEnviar) {
+    const currentUser = getCurrentUser();
+    const despachados = db.paquetes
+      .filter((p) => p.estado === 'EN_TRANSITO' && p.sucursal_origen === currentUser.sucursal_id)
+      .sort((a, b) => ((b.enviado_at || b.created_at || '') > (a.enviado_at || a.created_at || '') ? 1 : -1));
+    if (despachados.length > 0) {
+      const rowsD = despachados.map((p) => {
+        const clienteNom = p.cliente_nombre || db.clientes.find((c) => c.id === p.cliente_id)?.nombre || '-';
+        const destino = db.sucursales.find((s) => s.id === p.sucursal_destino)?.nombre || '-';
+        const hora = (p.enviado_at || p.created_at || '').slice(11, 16);
+        return `<tr>
+          <td>${hora}</td>
+          <td><b>${p.guia}</b></td>
+          <td>${clienteNom}</td>
+          <td>${p.descripcion || '-'}</td>
+          <td>${destino}</td>
+          <td>${money(p.monto)}</td>
+          <td><span class="badge en_transito">EN TRÁNSITO</span></td>
+        </tr>`;
+      }).join('');
+      despachadosPanel = `
+      <section class="panel" style="margin-top:0;border-left:3px solid var(--brand-500)">
+        <header class="panel-header">
+          <h3>Despachados de esta sucursal <span style="background:var(--brand-100);color:var(--brand-700);font-size:.78rem;font-weight:700;padding:.18rem .55rem;border-radius:999px;margin-left:.4rem">${despachados.length}</span></h3>
+        </header>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Hora</th><th>Guía</th><th>Cliente</th><th>Descripción</th><th>Destino</th><th>Monto</th><th>Estado</th></tr></thead>
+            <tbody>${rowsD}</tbody>
+          </table>
+        </div>
+      </section>`;
+    }
   }
 
   // ── Pendientes por enviar ──────────────────────────────────────────────────
@@ -801,7 +811,7 @@ function panelEscaneo(mode) {
       <p class="hint">Validación esperada: estado <b>${status}</b></p>
       <div id="scanFeedback" class="hint"></div>
     </div>
-    <div class="table-wrap" id="scanTable" style="margin-top:.7rem"></div>
+    ${!isEnviar ? '<div class="table-wrap" id="scanTable" style="margin-top:.7rem"></div>' : ''}
   </section>
   ${despachadosPanel}
   ${pendientesPanel}`;
@@ -918,6 +928,40 @@ function panelMiHistorial(userId) {
       `${x.entidad}:${x.entidad_id || '-'}`,
       x.resultado,
     ]))}</div>
+  </section>`;
+}
+
+// ─── INTELIGENCIA DE RUTAS ────────────────────────────────────────────────────
+
+function panelInteligencia() {
+  const user = getCurrentUser();
+  const isAdmin = user.rol === 'admin';
+  return `
+  <section class="panel">
+    <header class="panel-header">
+      <h3>🧠 Inteligencia de rutas</h3>
+      <div style="margin-left:auto;display:flex;gap:.5rem;align-items:center">
+        ${isAdmin ? '<button class="btn btn-sm" id="btnGenerateRecs">✨ Generar recomendaciones IA</button>' : ''}
+      </div>
+    </header>
+    <div id="etaRecomendaciones">
+      <div class="hint" style="padding:.6rem 0">Cargando recomendaciones...</div>
+    </div>
+  </section>
+  <section class="panel" style="margin-top:0">
+    <header class="panel-header">
+      <h3>Eficiencia por día de la semana</h3>
+      <span class="hint" style="margin-left:.75rem;font-size:.8rem">Tiempo promedio de tránsito por día</span>
+    </header>
+    <div id="etaEficiencia" style="min-height:56px">
+      <div class="hint" style="padding:.6rem 0">Cargando datos...</div>
+    </div>
+  </section>
+  <section class="panel" style="margin-top:0">
+    <header class="panel-header"><h3>Rendimiento de rutas</h3></header>
+    <div id="etaRutas" style="min-height:56px">
+      <div class="hint" style="padding:.6rem 0">Cargando...</div>
+    </div>
   </section>`;
 }
 

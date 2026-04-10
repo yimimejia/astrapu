@@ -75,7 +75,6 @@ function showAlert(msg, type = 'info') {
 function renderMenu() {
   refs.menu.innerHTML = getRoleMenu().map((v) => menuButton(v, currentView === v)).join('');
   refs.menu.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => {
-    if (b.dataset.view !== 'enviar_paquetes') viewState.escaneo.despachados = [];
     currentView = b.dataset.view;
     viewState.paquetes.selectedId = null;
     viewState.cuadres.selectedId = null;
@@ -134,6 +133,7 @@ function wireViewInteractions() {
   wireConfiguracion();
   wireVentasPanel();
   wireReportesPanel();
+  wireInteligencia();
 }
 
 // ─── REPORTES ─────────────────────────────────────────────────────────────────
@@ -731,26 +731,13 @@ function wireScanning() {
       headers: { 'x-idempotency-key': crypto.randomUUID() },
       body: { code },
     }).then(async (result) => {
-      if (result.ok && mode === 'enviar') {
-        // Registrar en la lista de despachados de la sesión
-        await syncDataFromBackend();
-        const pkg = db.paquetes.find((p) => p.guia === result.data.guia);
-        if (pkg) {
-          const clienteNom = pkg.cliente_nombre || db.clientes.find((c) => c.id === pkg.cliente_id)?.nombre || '-';
-          const destino = db.sucursales.find((s) => s.id === pkg.sucursal_destino)?.nombre || '-';
-          viewState.escaneo.despachados.unshift({
-            hora: new Date().toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-            guia: pkg.guia,
-            cliente: clienteNom,
-            descripcion: pkg.descripcion || '-',
-            destino,
-            monto: pkg.monto,
-          });
+      if (result.ok) {
+        if (mode === 'enviar') {
+          await render();
+        } else {
+          await syncDataFromBackend();
+          refreshTable();
         }
-        await render();
-      } else if (result.ok) {
-        await syncDataFromBackend();
-        refreshTable();
       } else {
         const feedbackEl = document.getElementById('scanFeedback');
         if (feedbackEl) { feedbackEl.textContent = result.error; feedbackEl.className = 'hint error'; }
@@ -1038,6 +1025,152 @@ async function tryAutoConnectQZ() {
     }
   } catch (_) {
   }
+}
+
+// ─── INTELIGENCIA DE RUTAS ────────────────────────────────────────────────────
+
+async function wireInteligencia() {
+  if (!document.getElementById('etaRecomendaciones')) return;
+
+  const DIAS_SHORT = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+  const TIPO_ICON = { trafico: '🚦', eficiencia: '📈', general: '💡' };
+  const CONFIANZA_LABEL = {
+    confianza_alta: '🟢 Alta',
+    confianza_media: '🟡 Media',
+    confianza_baja: '🟠 Baja',
+    aprendiendo: '⏳ Aprendiendo',
+  };
+
+  const renderAll = async () => {
+    const [recsRes, effRes] = await Promise.all([
+      api('/api/eta/recommendations'),
+      api('/api/eta/efficiency'),
+    ]).catch(() => [{ data: [] }, { data: [] }]);
+
+    // ── Recomendaciones ──────────────────────────────────────────────────────
+    const recsEl = document.getElementById('etaRecomendaciones');
+    if (recsEl) {
+      const recs = recsRes?.data || [];
+      if (recs.length === 0) {
+        const hint = getCurrentUser().rol === 'admin'
+          ? 'No hay recomendaciones activas esta semana. Haga clic en "Generar recomendaciones IA" para crearlas.'
+          : 'No hay recomendaciones activas esta semana.';
+        recsEl.innerHTML = `<div class="hint" style="padding:.6rem 0">${hint}</div>`;
+      } else {
+        recsEl.innerHTML = recs.map((r) => `
+          <div style="border:1px solid var(--gray-200);border-radius:.55rem;padding:.85rem 1rem;margin-bottom:.7rem;display:flex;align-items:flex-start;gap:.75rem">
+            <span style="font-size:1.35rem;line-height:1">${TIPO_ICON[r.tipo] || '💡'}</span>
+            <div style="flex:1;min-width:0">
+              <div style="font-weight:700;margin-bottom:.2rem">${r.titulo}</div>
+              <div style="color:var(--gray-600);font-size:.9rem;line-height:1.45">${r.mensaje}</div>
+            </div>
+            <button class="btn btn-sm" data-action="accept-rec" data-id="${r.id}" style="white-space:nowrap;flex-shrink:0">✓ Aceptar</button>
+          </div>`).join('');
+      }
+    }
+
+    // ── Eficiencia por día ───────────────────────────────────────────────────
+    const effEl = document.getElementById('etaEficiencia');
+    if (effEl) {
+      const stats = effRes?.data || [];
+      const byDay = {};
+      for (const s of stats) {
+        for (const [d, m] of Object.entries(s.promedio_por_dia || {})) {
+          if (!byDay[d]) byDay[d] = [];
+          byDay[d].push(Number(m));
+        }
+      }
+      const dayEntries = Object.entries(byDay).map(([d, vals]) => ({
+        label: DIAS_SHORT[Number(d)] || `D${d}`,
+        avg: vals.reduce((a, b) => a + b, 0) / vals.length,
+      }));
+      if (dayEntries.length === 0) {
+        effEl.innerHTML = `<div class="hint" style="padding:.6rem 0">El sistema está en período de aprendizaje. Los datos aparecerán cuando haya suficientes envíos completados.</div>`;
+      } else {
+        const maxVal = Math.max(...dayEntries.map((d) => d.avg), 1);
+        effEl.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:.5rem 1rem;padding:.6rem 0">
+          ${dayEntries.map(({ label, avg }) => {
+            const pct = Math.round((avg / maxVal) * 100);
+            const h = Math.floor(avg / 60);
+            const m = Math.round(avg % 60);
+            const timeStr = h > 0 ? `${h}h ${m}m` : `${m} min`;
+            return `<div>
+              <div style="display:flex;justify-content:space-between;font-size:.82rem;margin-bottom:.25rem">
+                <span style="font-weight:600">${label}</span>
+                <span style="color:var(--gray-500)">${timeStr}</span>
+              </div>
+              <div style="height:8px;background:var(--gray-100);border-radius:4px;overflow:hidden">
+                <div style="height:100%;width:${pct}%;background:var(--brand-500);border-radius:4px;transition:width .3s"></div>
+              </div>
+            </div>`;
+          }).join('')}
+        </div>`;
+      }
+    }
+
+    // ── Rutas ────────────────────────────────────────────────────────────────
+    const rutasEl = document.getElementById('etaRutas');
+    if (rutasEl) {
+      const stats = effRes?.data || [];
+      if (stats.length === 0) {
+        rutasEl.innerHTML = `<div class="hint" style="padding:.6rem 0">No hay datos de rutas registrados aún. Los datos se generan automáticamente al despachar y recibir paquetes.</div>`;
+      } else {
+        const sorted = [...stats].sort((a, b) => b.muestras_totales - a.muestras_totales);
+        const rows = sorted.map((s) => {
+          const h = Math.floor(s.promedio_general_minutos / 60);
+          const m = Math.round(s.promedio_general_minutos % 60);
+          const timeStr = h > 0 ? `${h}h ${m}m` : `${m} min`;
+          return `<tr>
+            <td>${s.origen_nombre}</td>
+            <td>${s.destino_nombre}</td>
+            <td><b>${timeStr}</b></td>
+            <td>${s.muestras_totales}</td>
+            <td>${CONFIANZA_LABEL[s.estado_modelo] || '—'}</td>
+          </tr>`;
+        }).join('');
+        rutasEl.innerHTML = `<div class="table-wrap"><table>
+          <thead><tr><th>Origen</th><th>Destino</th><th>Tiempo promedio</th><th>Muestras</th><th>Confianza</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table></div>`;
+      }
+    }
+
+    // Wire accept buttons
+    document.querySelectorAll('[data-action="accept-rec"]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        await api(`/api/eta/recommendations/${btn.dataset.id}/accept`, { method: 'POST' });
+        await renderAll();
+      });
+    });
+
+    // Wire generate button
+    const genBtn = document.getElementById('btnGenerateRecs');
+    if (genBtn) {
+      genBtn.addEventListener('click', async () => {
+        genBtn.disabled = true;
+        genBtn.textContent = 'Generando...';
+        try {
+          const result = await api('/api/eta/recommendations/generate', { method: 'POST' });
+          if (result.ok) {
+            const msg = result.data?.message || `${result.data?.generated ?? 0} recomendación(es) generada(s)`;
+            showAlert(msg, 'info');
+            await renderAll();
+          } else {
+            showAlert(result.data?.message || result.error || 'Error al generar recomendaciones', 'error');
+            genBtn.disabled = false;
+            genBtn.textContent = '✨ Generar recomendaciones IA';
+          }
+        } catch (e) {
+          showAlert(e.message, 'error');
+          genBtn.disabled = false;
+          genBtn.textContent = '✨ Generar recomendaciones IA';
+        }
+      });
+    }
+  };
+
+  await renderAll();
 }
 
 // ─── INICIO ───────────────────────────────────────────────────────────────────

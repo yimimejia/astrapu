@@ -38,10 +38,11 @@ export const MENUS = {
     'auditoria',
     'reportes',
     'facturacion',
+    'inteligencia',
     'configuracion',
     'impresoras',
   ],
-  envios: ['nuevo_envio', 'enviar_paquetes', 'historial_ventas', 'cierre_caja', 'clientes', 'mi_historial', 'perfil', 'impresoras'],
+  envios: ['nuevo_envio', 'enviar_paquetes', 'historial_ventas', 'cierre_caja', 'clientes', 'inteligencia', 'mi_historial', 'perfil', 'impresoras'],
   entrega: ['recibir_paquetes', 'buscar_paquete', 'entregar_paquete', 'paquetes_entregados', 'mi_historial', 'perfil'],
   contable: ['dashboard_contable', 'cuadres', 'ventas', 'paquetes', 'auditoria', 'reportes', 'facturacion', 'perfil'],
 };
@@ -51,6 +52,7 @@ export const VIEW_LABELS = {
   nuevo_envio: 'Nuevo envío', enviar_paquetes: 'Enviar paquetes', historial_ventas: 'Historial de ventas', cierre_caja: 'Cierre de caja', mi_historial: 'Mi historial', perfil: 'Perfil',
   recibir_paquetes: 'Recibir paquetes', buscar_paquete: 'Buscar paquete', entregar_paquete: 'Entregar paquete', paquetes_entregados: 'Paquetes entregados',
   dashboard_contable: 'Dashboard contable', ventas: 'Ventas',
+  inteligencia: 'Inteligencia de rutas',
 };
 
 export const VIEW_ICONS = {
@@ -58,4 +60,5 @@ export const VIEW_ICONS = {
   nuevo_envio: '＋', enviar_paquetes: '🚚', historial_ventas: '📋', cierre_caja: '💰', mi_historial: '📋', perfil: '👤',
   recibir_paquetes: '📥', buscar_paquete: '🔎', entregar_paquete: '✅', paquetes_entregados: '📦',
   dashboard_contable: '◈', ventas: '💳',
+  inteligencia: '🧠',
 };

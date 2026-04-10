@@ -7,11 +7,16 @@
     "dev": "PORT=5000 node server/index.js"
   },
   "dependencies": {
+    "@google/genai": "^1.49.0",
+    "drizzle-zod": "^0.8.3",
     "express": "^4.19.2",
     "express-rate-limit": "^8.3.2",
     "jsonwebtoken": "^9.0.2",
+    "p-limit": "^7.3.0",
+    "p-retry": "^7.1.1",
     "qz-tray": "^2.2.6",
     "sqlite3": "^5.1.7",
-    "zod": "^4.3.6"
+    "zod": "^4.3.6",
+    "zod-validation-error": "^5.0.0"
   }
 }

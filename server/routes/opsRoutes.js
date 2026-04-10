@@ -7,6 +7,7 @@ import { withIdempotency } from '../lib/idempotency.js';
 import { validateBody } from '../middleware/validation.js';
 import { closeCashSchema, confirmDeliverySchema, registerEnvioSchema, scanSchema, startDeliverySchema } from '../validation/schemas.js';
 import { sendError } from '../lib/http.js';
+import { registerSampleStart, registerSampleEnd } from '../services/routeEtaService.js';
 import { opsCloseLimiter, opsMutationLimiter, opsReadLimiter, opsScanLimiter, opsSearchLimiter } from '../middleware/rateLimit.js';
 
 export const opsRoutes = Router();
@@ -102,12 +103,19 @@ async function transitionByScan({ req, code, expectedState, newState, detail, au
 opsRoutes.post('/paquetes/scan-send', opsScanLimiter, forbidReadOnlyMutations, validateBody(scanSchema), async (req, res) => {
   const { code } = req.body;
   const result = await withIdempotency({ scope: 'scan_send', key: req.headers['x-idempotency-key'], refId: code, work: () => transitionByScan({ req, code, expectedState: 'PENDIENTE', newState: 'EN_TRANSITO', detail: 'Salida escaneada', auditAction: 'cambio_en_transito', timestampField: 'enviado_at' }) });
+  if (result?.ok && result?.data) {
+    const p = result.data;
+    registerSampleStart(p.id, p.sucursal_origen, p.sucursal_destino).catch(() => {});
+  }
   return sendResult(res, result, 'SCAN_REJECTED');
 });
 
 opsRoutes.post('/paquetes/scan-receive', opsScanLimiter, forbidReadOnlyMutations, validateBody(scanSchema), async (req, res) => {
   const { code } = req.body;
   const result = await withIdempotency({ scope: 'scan_receive', key: req.headers['x-idempotency-key'], refId: code, work: () => transitionByScan({ req, code, expectedState: 'EN_TRANSITO', newState: 'DISPONIBLE', detail: 'Recepción escaneada', auditAction: 'recepcion_paquete', timestampField: 'recibido_at' }) });
+  if (result?.ok && result?.data) {
+    registerSampleEnd(result.data.id).catch(() => {});
+  }
   return sendResult(res, result, 'SCAN_REJECTED');
 });
 
