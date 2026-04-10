@@ -72,6 +72,7 @@ export function renderView(view) {
     buscar_paquete: () => panelBuscar(),
     entregar_paquete: () => panelEntregar(),
     paquetes_entregados: () => panelEntregados(),
+    pendiente_notificar: () => panelPendienteNotificar(),
     ventas: () => panelVentas(),
   };
 
@@ -972,6 +973,73 @@ function panelEntregados() {
   return `<section class="panel">
     <header class="panel-header"><h3>Paquetes entregados</h3></header>
     <div class="table-wrap">${table(['Guía', 'Cliente', 'Teléfono', 'Entregado', 'Usuario', 'Sucursal'], []).replace('<tbody></tbody>', `<tbody>${rows || '<tr><td colspan="6">Sin paquetes entregados aún</td></tr>'}</tbody>`)}</div>
+  </section>`;
+}
+
+// ─── PENDIENTE NOTIFICAR ──────────────────────────────────────────────────────
+
+function panelPendienteNotificar() {
+  const pcfg = getPrinterConfig();
+  const empresa = pcfg.nombre_empresa || 'ASTRAPU';
+  const disponibles = db.paquetes.filter((p) => p.estado === PACKAGE_STATUS.DISPONIBLE);
+
+  const waLink = (tel, guia, clienteNom, destino) => {
+    const digits = (tel || '').replace(/\D/g, '');
+    const intl = digits.length === 10 ? `1${digits}` : digits;
+    const msg = encodeURIComponent(
+      `Hola ${clienteNom}, su paquete ${guia} ha llegado a nuestra sucursal ${destino} y está disponible para retiro. - ${empresa}`
+    );
+    return `https://wa.me/${intl}?text=${msg}`;
+  };
+
+  if (disponibles.length === 0) {
+    return `<section class="panel">
+      <header class="panel-header"><h3>📲 Pendiente notificar</h3></header>
+      <div class="notice success" style="margin-top:.75rem">✓ No hay paquetes pendientes de notificación.</div>
+    </section>`;
+  }
+
+  const rows = disponibles.map((p) => {
+    const c = db.clientes.find((x) => x.id === p.cliente_id);
+    const clienteNom = p.cliente_nombre || c?.nombre || '-';
+    const tel = p.telefono_destinatario || '';
+    const destino = sucursalNombre(p.sucursal_destino);
+    const recibido = p.recibido_at
+      ? new Date(p.recibido_at).toLocaleString('es-DO', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+      : '-';
+    const digits = tel.replace(/\D/g, '');
+    const canWa = digits.length >= 10;
+    const waUrl = canWa ? waLink(tel, p.guia, clienteNom, destino) : '';
+
+    return `<tr>
+      <td><b>${p.guia}</b></td>
+      <td>${clienteNom}</td>
+      <td>${tel || '-'}</td>
+      <td>${destino}</td>
+      <td>${recibido}</td>
+      <td>
+        ${canWa
+          ? `<a href="${waUrl}" target="_blank" rel="noopener noreferrer"
+               style="display:inline-flex;align-items:center;gap:.35rem;background:#25D366;color:#fff;
+                      border:none;padding:.3rem .75rem;border-radius:.35rem;font-size:.82rem;
+                      font-weight:600;text-decoration:none;cursor:pointer;white-space:nowrap">
+               📲 WhatsApp
+             </a>`
+          : `<span class="hint">Sin teléfono</span>`}
+      </td>
+    </tr>`;
+  }).join('');
+
+  return `<section class="panel">
+    <header class="panel-header">
+      <h3>📲 Pendiente notificar</h3>
+      <span class="badge" style="background:#fff3cd;color:#856404;border:1px solid #ffc107;margin-left:.6rem">${disponibles.length} paquete${disponibles.length !== 1 ? 's' : ''}</span>
+    </header>
+    <p class="hint" style="margin:.4rem 0 .85rem">Paquetes recibidos en sucursal y disponibles para retiro. Haga clic en <b>WhatsApp</b> para notificar al destinatario — se abrirá WhatsApp Web con el mensaje listo para enviar.</p>
+    <div class="table-wrap">
+      ${table(['Guía', 'Destinatario', 'Teléfono', 'Sucursal', 'Recibido', 'Notificar'], [])
+        .replace('<tbody></tbody>', `<tbody>${rows}</tbody>`)}
+    </div>
   </section>`;
 }
 

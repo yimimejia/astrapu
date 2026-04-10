@@ -59,8 +59,12 @@ export async function migrate() {
   await exec(sql);
   const sql2 = await readFile(path.join(__dirname, 'migrations', '002_eta.sql'), 'utf8');
   await exec(sql2);
-  const sql3 = await readFile(path.join(__dirname, 'migrations', '003_sucursal_telefono.sql'), 'utf8');
-  await exec(sql3);
+  try {
+    const sql3 = await readFile(path.join(__dirname, 'migrations', '003_sucursal_telefono.sql'), 'utf8');
+    await exec(sql3);
+  } catch (e) {
+    if (!String(e.message).includes('duplicate column')) throw e;
+  }
 
   await run(
     `INSERT OR IGNORE INTO usuarios(id, username, nombre, password_hash, rol, sucursal_id)
