@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "start": "node server/index.js",
-    "dev": "node server/index.js"
+    "start": "PORT=5000 node server/index.js",
+    "dev": "PORT=5000 node server/index.js"
   },
   "dependencies": {
     "express": "^4.19.2",
