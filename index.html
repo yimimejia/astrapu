@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Astrapu | Plataforma integral</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qz-tray/2.2.4/qz-tray.js"></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <span class="brand-mark">A</span>
+          <div>
+            <h1>Astrapu</h1>
+            <p>Paquetería interprovincial RD</p>
+          </div>
+        </div>
+
+        <label class="role-select">Rol activo
+          <select id="roleSwitcher">
+            <option value="admin">ADMIN</option>
+            <option value="envios">ENVIOS</option>
+            <option value="entrega">ENTREGA/RECIBE</option>
+            <option value="contable">CONTABLE</option>
+          </select>
+        </label>
+
+        <nav id="sideMenu"></nav>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div>
+            <h2 id="viewTitle">Dashboard</h2>
+            <p id="viewSubtitle">Operación activa</p>
+          </div>
+          <div class="session-cards">
+            <article><span>Usuario</span><strong id="sessionUser">-</strong></article>
+            <article><span>Rol</span><strong id="sessionRole">-</strong></article>
+            <article><span>Sucursal</span><strong id="sessionBranch">-</strong></article>
+          </div>
+        </header>
+
+        <div id="globalAlert" class="global-alert info">Sistema inicializado.</div>
+        <section id="appContent"></section>
+      </main>
+    </div>
+
+    <script type="module" src="src/app.js"></script>
+  </body>
+</html>

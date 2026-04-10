@@ -1,0 +1,54 @@
+export const ROLES = {
+  admin: 'ADMIN',
+  envios: 'ENVIOS',
+  entrega: 'ENTREGA/RECIBE',
+  contable: 'CONTABLE',
+};
+
+export const PACKAGE_STATUS = {
+  PENDIENTE: 'PENDIENTE',
+  EN_TRANSITO: 'EN_TRANSITO',
+  DISPONIBLE: 'DISPONIBLE',
+  ENTREGADO: 'ENTREGADO',
+  INCIDENCIA: 'INCIDENCIA',
+  CANCELADO: 'CANCELADO',
+};
+
+export const FISCAL_STATUS = [
+  'borrador',
+  'listo_para_firmar',
+  'firmado',
+  'enviado',
+  'en_proceso',
+  'aceptado',
+  'aceptado_condicional',
+  'rechazado',
+  'anulado',
+  'error_tecnico',
+];
+
+export const MENUS = {
+  admin: [
+    'dashboard',
+    'paquetes',
+    'clientes',
+    'sucursales',
+    'usuarios',
+    'cuadres',
+    'auditoria',
+    'reportes',
+    'facturacion',
+    'configuracion',
+    'impresoras',
+  ],
+  envios: ['nuevo_envio', 'enviar_paquetes', 'historial_ventas', 'cierre_caja', 'clientes', 'mi_historial', 'perfil', 'impresoras'],
+  entrega: ['recibir_paquetes', 'buscar_paquete', 'entregar_paquete', 'paquetes_entregados', 'mi_historial', 'perfil'],
+  contable: ['dashboard_contable', 'cuadres', 'ventas', 'paquetes', 'auditoria', 'reportes', 'facturacion', 'perfil'],
+};
+
+export const VIEW_LABELS = {
+  dashboard: 'Dashboard', paquetes: 'Paquetes', clientes: 'Clientes', sucursales: 'Sucursales', usuarios: 'Usuarios', cuadres: 'Cuadres', auditoria: 'Auditoría', reportes: 'Reportes', facturacion: 'Facturación electrónica', configuracion: 'Configuración', impresoras: 'Configuración de impresoras',
+  nuevo_envio: 'Nuevo envío', enviar_paquetes: 'Enviar paquetes', historial_ventas: 'Historial de ventas', cierre_caja: 'Cierre de caja', mi_historial: 'Mi historial', perfil: 'Perfil',
+  recibir_paquetes: 'Recibir paquetes', buscar_paquete: 'Buscar paquete', entregar_paquete: 'Entregar paquete', paquetes_entregados: 'Paquetes entregados',
+  dashboard_contable: 'Dashboard contable', ventas: 'Ventas',
+};
