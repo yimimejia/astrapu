@@ -1,0 +1,260 @@
+Quiero que implementes en Astrapu un sistema inteligente de tiempo estimado de llegada para paquetes entre sucursales, usando un enfoque híbrido: primero reglas y estadísticas reales, y encima una capa de IA/predicción que aprenda del comportamiento de las rutas.
+
+OBJETIVO
+Necesito que el sistema aprenda automáticamente cuánto tarda un paquete en llegar desde una sucursal a otra, y que durante los primeros 7 días de operación por cada ruta nueva el sistema quede en modo aprendizaje. Después de ese período, debe empezar a mostrar un tiempo estimado de llegada cada vez más preciso.
+
+REGLA PRINCIPAL
+La IA no debe reemplazar la lógica base.
+Primero debe existir una lógica sólida de medición real:
+- cuando un paquete pasa a EN TRANSITO, inicia la medición
+- cuando el paquete pasa a RECIBIDO / DISPONIBLE PARA ENTREGA, termina la medición
+- esa duración real se guarda por ruta
+- encima de eso se monta la capa de predicción inteligente
+
+CONCEPTO DE RUTA
+Una ruta es:
+- sucursal_origen -> sucursal_destino
+
+Ejemplo:
+- San Pedro -> Santo Domingo
+- Santiago -> La Romana
+
+Cada ruta debe aprender por separado.
+
+COMPORTAMIENTO DURANTE LOS PRIMEROS 7 DÍAS
+Para una ruta nueva:
+- el sistema no mostrará un tiempo fijo todavía
+- debe mostrar: “Evaluando tiempo estimado”
+- durante esos 7 días debe recopilar:
+  - fecha y hora de salida
+  - fecha y hora de llegada
+  - duración real total
+  - día de la semana
+  - franja horaria de salida
+  - sucursal origen
+  - sucursal destino
+  - cantidad de paquetes enviados en esa ruta ese día
+  - si hubo retraso frente al patrón normal
+- la IA o motor de predicción debe usar esos datos para comenzar a aprender
+
+DESPUÉS DE LOS PRIMEROS 7 DÍAS
+Luego de reunir al menos 7 días de comportamiento de una ruta:
+- mostrar tiempo estimado de llegada
+- mostrarlo por ejemplo como:
+  - “Tiempo estimado: 4 horas 20 minutos”
+  - o “Tiempo estimado: hoy antes de las 6:30 PM”
+- el cálculo debe combinar:
+  1. promedio real histórico
+  2. comportamiento por día de la semana
+  3. comportamiento por franja horaria
+  4. nivel de carga de la ruta
+  5. capa de predicción inteligente para ajustar el estimado
+
+LÓGICA DE APRENDIZAJE INTELIGENTE
+Quiero que implementes un módulo de predicción de ETA para rutas.
+
+Ese módulo debe:
+- aprender con los envíos reales ya registrados
+- actualizarse automáticamente con los nuevos datos
+- detectar patrones como:
+  - días más congestionados
+  - días más rápidos
+  - horas más lentas
+  - horas más rápidas
+- ajustar el ETA sin depender solo de un promedio bruto
+
+Ejemplo:
+Si de 7 días:
+- 4 días llegaron en 4 horas
+- 3 días llegaron en 6 horas
+la predicción no debe quedarse en una media simple ciega.
+Debe detectar si:
+- los 3 días lentos fueron viernes
+- o fueron días de mucha carga
+- o salieron a cierta hora
+Entonces debe ajustar el ETA según esas condiciones.
+
+REGLAS IMPORTANTES DEL MODELO
+1. Debe existir una base estadística obligatoria.
+2. La IA debe refinar, no inventar.
+3. Debe ignorar o reducir impacto de valores extremos anormales.
+4. Debe poder recalcular dos veces al mes para mantenerse actualizada.
+5. Debe permitir que el sistema siga funcionando aunque la parte “IA” falle.
+6. Si no hay suficientes datos, debe seguir mostrando “Evaluando tiempo estimado”.
+
+DATOS A USAR PARA PREDICCIÓN
+El motor debe tomar en cuenta como mínimo:
+- sucursal origen
+- sucursal destino
+- día de la semana
+- hora o franja horaria de salida
+- cantidad de paquetes de esa ruta ese día
+- historial promedio de esa ruta
+- historial promedio por día
+- historial promedio por franja
+- tendencia reciente de la ruta
+
+ESTADOS Y RESULTADOS
+El sistema debe poder devolver:
+- evaluando
+- estimado disponible
+- confianza baja
+- confianza media
+- confianza alta
+
+Ejemplo de salida:
+- ETA estimado: 5h 10m
+- confianza: media
+- base: 23 viajes analizados
+
+TABLAS O ESTRUCTURAS NECESARIAS
+Crea o adapta estructuras para guardar como mínimo:
+
+1. route_eta_samples
+- id
+- sucursal_origen_id
+- sucursal_destino_id
+- paquete_id
+- fecha_salida
+- fecha_llegada
+- duracion_minutos
+- dia_semana
+- franja_horaria
+- volumen_ruta_dia
+- created_at
+
+2. route_eta_stats
+- id
+- sucursal_origen_id
+- sucursal_destino_id
+- muestras_totales
+- promedio_general_minutos
+- promedio_por_dia_json
+- promedio_por_franja_json
+- fecha_ultima_actualizacion
+- estado_modelo
+- confianza
+
+3. route_eta_predictions
+- id
+- sucursal_origen_id
+- sucursal_destino_id
+- fecha_prediccion
+- dia_semana
+- franja_horaria
+- eta_estimado_minutos
+- confianza
+- base_muestras
+- metadata_json
+
+4. route_eta_jobs o similar
+- id
+- tipo_job
+- estado
+- fecha_inicio
+- fecha_fin
+- resultado_json
+
+SERVICIO O MÓDULO A IMPLEMENTAR
+Quiero un módulo separado, por ejemplo:
+- routeEtaService
+- etaPredictionService
+- routeLearningService
+
+Ese módulo debe tener funciones como:
+- registerRouteSampleFromPackage(packageId)
+- updateRouteStats(originId, destinationId)
+- getRouteEta(originId, destinationId, context)
+- recalculateAllRouteEtas()
+- classifyRouteDayLoad(originId, destinationId, date)
+- detectRouteOutliers(originId, destinationId)
+
+CAPA “IA” O PREDICCIÓN
+Implementa una capa de predicción práctica dentro del backend.
+No quiero un truco visual.
+Quiero una lógica real que pueda considerarse “IA aplicada” dentro del sistema.
+
+Si Replit permite usar librerías o lógica de predicción liviana, úsala de forma razonable.
+Si no conviene meter un modelo pesado, implementa un motor inteligente basado en:
+- weighted averages
+- scoring
+- tendencia reciente
+- ajuste por contexto
+- clasificación de días cargados
+- descarte o reducción de outliers
+- confianza del estimado
+
+IMPORTANTE:
+No quiero una falsa IA.
+Quiero una predicción inteligente y útil, mantenible y explicable.
+
+FRECUENCIA DE RECÁLCULO
+Necesito que el sistema:
+- actualice estadísticas con cada nuevo paquete recibido
+- y además haga una recalibración global 2 veces al mes
+- deja preparado el job scheduler o cron interno para eso
+
+INTEGRACIÓN CON LOS FLUJOS DEL SISTEMA
+Conecta esta lógica a lo ya existente:
+- cuando un paquete pasa a EN TRANSITO, guardar inicio
+- cuando pasa a RECIBIDO / DISPONIBLE, cerrar medición
+- registrar muestra automáticamente
+- recalcular estadísticas de la ruta
+- mostrar ETA en:
+  - detalle del paquete
+  - resultados de búsqueda
+  - panel de seguimiento
+  - panel admin/reportes si aplica
+
+INTERFAZ
+Quiero que la UI muestre claramente:
+- si la ruta está en aprendizaje
+- si ya tiene ETA calculado
+- cuántas muestras tiene
+- nivel de confianza
+- si el valor mostrado es aproximado
+
+Ejemplo visual:
+- Estado ETA: Evaluando
+- Muestras: 4/7 días mínimos
+
+o
+
+- ETA estimado: 4h 35m
+- Confianza: alta
+- Basado en: 31 envíos
+
+REPORTES
+Agrega reportes para admin:
+- rutas más rápidas
+- rutas más lentas
+- rutas con más variación
+- rutas todavía en aprendizaje
+- promedio por ruta
+- promedio por día
+- días más congestionados por ruta
+
+VALIDACIONES
+- no generar ETA si no hay suficientes datos
+- no contar paquetes incompletos o cancelados
+- no usar datos corruptos o negativos
+- proteger contra duplicación de muestras
+- si un paquete ya generó muestra, no repetirla
+
+ENTREGABLES
+Quiero que respondas así:
+1. qué archivos vas a crear o modificar
+2. cómo implementarás la capa de aprendizaje y predicción
+3. el código completo
+4. cómo se integra con paquetes ya existentes
+5. cómo se muestra en la interfaz
+6. cómo funciona durante los primeros 7 días
+7. cómo recalcula después
+8. qué parte es estadística base y qué parte es predicción inteligente
+
+IMPORTANTE
+- No rompas la lógica actual de paquetes.
+- No reemplaces el sistema existente; extiéndelo correctamente.
+- No hagas una maqueta vacía.
+- Quiero lógica real, útil y explicable.
+- Si necesitas dividir entre backend, servicio y UI, hazlo de forma limpia.

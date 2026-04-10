@@ -27,6 +27,7 @@ export const viewState = {
   auditoria: { page: 1, usuario: '', modulo: '', accion: '', date_from: '', date_to: '' },
   cuadres: { selectedId: null },
   fiscal: { tab: 'estado' },
+  escaneo: { despachados: [] },
 };
 
 function clienteNombre(clienteId) {
@@ -374,6 +375,23 @@ function panelCuadres() {
 function panelCuadreDetalle(cierreId) {
   const c = db.cierres_caja.find((x) => x.id === cierreId);
   if (!c) return '';
+
+  const ventas = db.ventas.filter((v) => v.cierre_id === cierreId);
+  const ventasRows = ventas.map((v) => {
+    const pkg = db.paquetes.find((p) => p.guia === v.guia);
+    const destino = pkg ? sucursalNombre(pkg.sucursal_destino) : '-';
+    const descripcion = pkg?.descripcion || '-';
+    return `<tr>
+      <td><b>${v.guia}</b></td>
+      <td>${v.cliente_nombre || v.cliente || '-'}</td>
+      <td>${descripcion}</td>
+      <td>${destino}</td>
+      <td>${money(v.monto)}</td>
+      <td>${v.metodo_pago}</td>
+      <td>${fmtDate(v.fecha_hora || v.created_at)}</td>
+    </tr>`;
+  }).join('') || `<tr><td colspan="7" style="text-align:center;color:var(--gray-400)">Sin envíos en este cuadre</td></tr>`;
+
   return `<section class="panel panel-secondary">
     <header class="panel-header">
       <h3>Detalle cierre</h3>
@@ -394,6 +412,13 @@ function panelCuadreDetalle(cierreId) {
       <div><b>Tarjeta:</b> ${money(c.total_tarjeta)}</div>
       <div><b>Otros:</b> ${money(c.total_otros)}</div>
       <div><b>Observación:</b> ${c.observacion || '-'}</div>
+    </div>
+    <h4 style="margin:1.2rem 0 .5rem;font-size:.93rem;color:var(--gray-600)">Envíos incluidos en este cuadre (${ventas.length})</h4>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Guía</th><th>Cliente</th><th>Descripción</th><th>Destino</th><th>Monto</th><th>Método pago</th><th>Fecha/Hora</th></tr></thead>
+        <tbody>${ventasRows}</tbody>
+      </table>
     </div>
   </section>`;
 }
@@ -686,7 +711,6 @@ function panelNuevoEnvio(readOnly) {
             <option value="OTRO">Otro</option>
           </select>
         </label>
-        <label>Sucursal origen<select name="sucursal_origen">${options}</select></label>
         <label>Sucursal destino<select name="sucursal_destino">${options}</select></label>
         <label class="full">Observación<textarea name="observacion" rows="2"></textarea></label>
         <div class="full actions">
@@ -705,28 +729,55 @@ function panelEscaneo(mode) {
   const isEnviar = mode === 'enviar';
   const status = isEnviar ? 'PENDIENTE' : 'EN_TRANSITO';
 
+  // ── Despachados en esta sesión (solo modo enviar) ──────────────────────────
+  let despachadosPanel = '';
+  if (isEnviar && viewState.escaneo.despachados.length > 0) {
+    const rowsD = viewState.escaneo.despachados.map((d) => {
+      return `<tr>
+        <td>${d.hora}</td>
+        <td><b>${d.guia}</b></td>
+        <td>${d.cliente}</td>
+        <td>${d.descripcion}</td>
+        <td>${d.destino}</td>
+        <td>${money(d.monto)}</td>
+        <td><span class="badge en_transito">EN TRÁNSITO</span></td>
+      </tr>`;
+    }).join('');
+    despachadosPanel = `
+    <section class="panel" style="margin-top:0;border-left:3px solid var(--brand-500)">
+      <header class="panel-header">
+        <h3>Despachados en esta sesión <span style="background:var(--brand-100);color:var(--brand-700);font-size:.78rem;font-weight:700;padding:.18rem .55rem;border-radius:999px;margin-left:.4rem">${viewState.escaneo.despachados.length}</span></h3>
+      </header>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Hora</th><th>Guía</th><th>Cliente</th><th>Descripción</th><th>Destino</th><th>Monto</th><th>Estado</th></tr></thead>
+          <tbody>${rowsD}</tbody>
+        </table>
+      </div>
+    </section>`;
+  }
+
+  // ── Pendientes por enviar ──────────────────────────────────────────────────
   let pendientesPanel = '';
   if (isEnviar) {
     const pendientes = db.paquetes.filter((p) => p.estado === 'PENDIENTE');
     const rows = pendientes.map((p) => {
       const clienteNom = p.cliente_nombre || db.clientes.find((c) => c.id === p.cliente_id)?.nombre || '-';
-      const origen = db.sucursales.find((s) => s.id === p.sucursal_origen)?.nombre || '-';
       const destino = db.sucursales.find((s) => s.id === p.sucursal_destino)?.nombre || '-';
       const fecha = fmtDate(p.created_at);
       return `<tr>
         <td><b>${p.guia}</b></td>
         <td>${clienteNom}</td>
         <td>${p.descripcion || '-'}</td>
-        <td>${origen}</td>
         <td>${destino}</td>
         <td>${money(p.monto)}</td>
         <td>${fecha}</td>
         <td style="white-space:nowrap">
-          <button class="btn btn-sm" data-action="scan-guia" data-guia="${p.guia}" title="Escanear este paquete para enviarlo">📤 Escanear</button>
+          <button class="btn btn-sm" data-action="scan-guia" data-guia="${p.guia}" title="Marcar como enviado">📤 Enviar</button>
           <button class="btn btn-sm" data-action="reimprimir-paquete" data-id="${p.id}" title="Reimprimir ticket y etiqueta">🖨️ Reimprimir</button>
         </td>
       </tr>`;
-    }).join('') || `<tr><td colspan="8" style="text-align:center;color:var(--gray-400)">No hay paquetes pendientes de envío</td></tr>`;
+    }).join('') || `<tr><td colspan="7" style="text-align:center;color:var(--gray-400)">No hay paquetes pendientes de envío</td></tr>`;
 
     pendientesPanel = `
     <section class="panel" style="margin-top:0">
@@ -735,7 +786,7 @@ function panelEscaneo(mode) {
       </header>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Guía</th><th>Cliente</th><th>Descripción</th><th>Origen</th><th>Destino</th><th>Monto</th><th>Fecha</th><th>Acciones</th></tr></thead>
+          <thead><tr><th>Guía</th><th>Cliente</th><th>Descripción</th><th>Destino</th><th>Monto</th><th>Fecha</th><th>Acciones</th></tr></thead>
           <tbody>${rows}</tbody>
         </table>
       </div>
@@ -752,6 +803,7 @@ function panelEscaneo(mode) {
     </div>
     <div class="table-wrap" id="scanTable" style="margin-top:.7rem"></div>
   </section>
+  ${despachadosPanel}
   ${pendientesPanel}`;
 }
 

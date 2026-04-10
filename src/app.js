@@ -75,6 +75,7 @@ function showAlert(msg, type = 'info') {
 function renderMenu() {
   refs.menu.innerHTML = getRoleMenu().map((v) => menuButton(v, currentView === v)).join('');
   refs.menu.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => {
+    if (b.dataset.view !== 'enviar_paquetes') viewState.escaneo.despachados = [];
     currentView = b.dataset.view;
     viewState.paquetes.selectedId = null;
     viewState.cuadres.selectedId = null;
@@ -670,6 +671,8 @@ function wireEnvioForm() {
     const fd = new FormData(form);
     const payload = Object.fromEntries(fd.entries());
     payload.telefono = payload.telefono.replace(/\D/g, '');
+    // Sucursal origen = sucursal asignada al empleado que está haciendo el envío
+    payload.sucursal_origen = getCurrentUser().sucursal_id;
     try {
       const result = await api('/api/ops/envios', {
         method: 'POST',
@@ -728,18 +731,37 @@ function wireScanning() {
       headers: { 'x-idempotency-key': crypto.randomUUID() },
       body: { code },
     }).then(async (result) => {
-      if (feedback) {
-        feedback.textContent = result.ok ? `✓ ${result.data.guia} → ${result.data.estado}` : result.error;
-        feedback.className = `hint ${result.ok ? 'success' : 'error'}`;
+      if (result.ok && mode === 'enviar') {
+        // Registrar en la lista de despachados de la sesión
+        await syncDataFromBackend();
+        const pkg = db.paquetes.find((p) => p.guia === result.data.guia);
+        if (pkg) {
+          const clienteNom = pkg.cliente_nombre || db.clientes.find((c) => c.id === pkg.cliente_id)?.nombre || '-';
+          const destino = db.sucursales.find((s) => s.id === pkg.sucursal_destino)?.nombre || '-';
+          viewState.escaneo.despachados.unshift({
+            hora: new Date().toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+            guia: pkg.guia,
+            cliente: clienteNom,
+            descripcion: pkg.descripcion || '-',
+            destino,
+            monto: pkg.monto,
+          });
+        }
+        await render();
+      } else if (result.ok) {
+        await syncDataFromBackend();
+        refreshTable();
+      } else {
+        const feedbackEl = document.getElementById('scanFeedback');
+        if (feedbackEl) { feedbackEl.textContent = result.error; feedbackEl.className = 'hint error'; }
+        const inputEl = document.getElementById('scanInput');
+        if (inputEl) { inputEl.value = ''; inputEl.focus(); }
       }
-      input.value = '';
-      input.focus();
-      await syncDataFromBackend();
-      refreshTable();
     }).catch((error) => {
-      if (feedback) { feedback.textContent = error.message; feedback.className = 'hint error'; }
-      input.value = '';
-      input.focus();
+      const feedbackEl = document.getElementById('scanFeedback');
+      if (feedbackEl) { feedbackEl.textContent = error.message; feedbackEl.className = 'hint error'; }
+      const inputEl = document.getElementById('scanInput');
+      if (inputEl) { inputEl.value = ''; inputEl.focus(); }
     });
   };
 
