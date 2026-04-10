@@ -64,6 +64,7 @@ export const db = {
     nombre_empresa: 'ASTRAPU',
     subtitulo: 'Paquetería Interprovincial RD',
     telefono: '',
+    rnc: '',
     mensaje_final: 'Gracias por preferirnos',
   },
   historial_impresion: [],

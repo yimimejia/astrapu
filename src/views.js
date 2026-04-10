@@ -585,7 +585,9 @@ function panelConfiguracion() {
   const nombreEmp  = esc(pcfg.nombre_empresa  || 'ASTRAPU');
   const subtitulo  = esc(pcfg.subtitulo       || 'Paquetería Interprovincial RD');
   const telefono   = esc(pcfg.telefono        || '');
+  const rnc        = esc(pcfg.rnc             || '');
   const msgFinal   = esc(pcfg.mensaje_final   || 'Gracias por preferirnos');
+  const telRncPrev = [telefono ? `Tel: ${telefono}` : '', rnc ? `RNC: ${rnc}` : ''].filter(Boolean).join('  ');
 
   return `<section class="panel">
     <header class="panel-header"><h3>Configuración general</h3></header>
@@ -624,10 +626,13 @@ function panelConfiguracion() {
         <label style="grid-column:1/-1">Subtítulo
           <input id="pcSubtitulo" name="subtitulo" value="${subtitulo}" placeholder="Paquetería Interprovincial RD" />
         </label>
-        <label>Teléfono
+        <label>Teléfono de la empresa
           <input id="pcTelefono" name="telefono" value="${telefono}" placeholder="809-000-0000" />
         </label>
-        <label>Mensaje final del ticket
+        <label>RNC de la empresa
+          <input id="pcRnc" name="rnc" value="${rnc}" placeholder="1-01-00000-0" />
+        </label>
+        <label style="grid-column:1/-1">Mensaje final del ticket
           <input id="pcMensajeFinal" name="mensaje_final" value="${msgFinal}" placeholder="Gracias por preferirnos" />
         </label>
         <div class="actions full" style="margin-top:.25rem">
@@ -640,9 +645,9 @@ function panelConfiguracion() {
         <div>
           <p style="font-size:.8rem;font-weight:600;color:var(--gray-500);margin-bottom:.5rem;text-transform:uppercase;letter-spacing:.04em">Vista previa — Ticket térmico (80mm)</p>
           <div id="previewTicket" style="background:#fff;border:1px solid var(--gray-300);border-radius:.35rem;padding:.85rem .9rem;max-width:290px;font-family:'Courier New',monospace;font-size:.74rem;line-height:1.5;box-shadow:2px 2px 6px rgba(0,0,0,.07)">
-            <div style="text-align:center;font-weight:800;font-size:1.1em;letter-spacing:.04em" id="pv-nombre">${nombreEmp}</div>
+            <div style="text-align:center;font-weight:900;font-size:1.25em;letter-spacing:.04em" id="pv-nombre">${nombreEmp}</div>
             <div style="text-align:center;font-size:.9em" id="pv-subtitulo">${subtitulo}</div>
-            <div style="text-align:center;font-size:.83em;color:#555;${telefono ? '' : 'display:none'}" id="pv-telefono">${telefono ? 'Tel: ' + telefono : ''}</div>
+            <div style="text-align:center;font-size:.8em;color:#444;${telRncPrev ? '' : 'display:none'}" id="pv-tel-rnc">${telRncPrev}</div>
             <div style="border-top:2px solid #222;margin:.4rem 0"></div>
             <div>GUIA: <b>GUIA-000000001</b></div>
             <div>Fecha: 10/04/2026 08:35</div>

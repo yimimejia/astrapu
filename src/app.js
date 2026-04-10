@@ -645,10 +645,12 @@ function wireConfiguracion() {
       }
     }
     const tel = document.getElementById('pcTelefono')?.value || '';
-    const telEl = document.getElementById('pv-telefono');
-    if (telEl) {
-      telEl.textContent = tel ? `Tel: ${tel}` : '';
-      telEl.style.display = tel ? '' : 'none';
+    const rnc = document.getElementById('pcRnc')?.value || '';
+    const combined = [tel ? `Tel: ${tel}` : '', rnc ? `RNC: ${rnc}` : ''].filter(Boolean).join('  ');
+    const telRncEl = document.getElementById('pv-tel-rnc');
+    if (telRncEl) {
+      telRncEl.textContent = combined;
+      telRncEl.style.display = combined ? '' : 'none';
     }
   };
 
@@ -662,6 +664,7 @@ function wireConfiguracion() {
     pcfg.nombre_empresa = fd.get('nombre_empresa') || pcfg.nombre_empresa;
     pcfg.subtitulo      = fd.get('subtitulo')      || pcfg.subtitulo;
     pcfg.telefono       = fd.get('telefono')        || '';
+    pcfg.rnc            = fd.get('rnc')             || '';
     pcfg.mensaje_final  = fd.get('mensaje_final')   || pcfg.mensaje_final;
     setPrinterConfig(pcfg.termica, pcfg.adhesiva);
     const feedback = document.getElementById('printConfigFeedback');

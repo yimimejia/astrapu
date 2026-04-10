@@ -131,8 +131,11 @@ function escposTicket(data) {
 
   const nombre   = (pcfg.nombre_empresa || 'ASTRAPU').slice(0, W);
   const sub      = (pcfg.subtitulo      || 'Paquetería Interprovincial RD').slice(0, W);
-  const tel      = pcfg.telefono ? `Tel: ${pcfg.telefono}` : '';
   const msgFinal = (pcfg.mensaje_final  || 'Gracias por preferirnos').slice(0, W);
+  const telRnc   = [
+    pcfg.telefono ? `Tel: ${pcfg.telefono}` : '',
+    pcfg.rnc      ? `RNC: ${pcfg.rnc}`      : '',
+  ].filter(Boolean).join('  ').slice(0, W);
 
   const total    = parseFloat(data.monto) || 0;
   const subtotal = total / 1.18;
@@ -161,11 +164,11 @@ function escposTicket(data) {
   return [
     '\x1B\x40',
     '\x1B\x61\x01',
-    '\x1B\x21\x30',
+    '\x1B\x21\x38',
     `${nombre}\n`,
     '\x1B\x21\x00',
     `${sub}\n`,
-    tel ? `${tel}\n` : '',
+    telRnc ? `${telRnc}\n` : '',
     `${EQ}\n`,
     '\x1B\x61\x00',
     `GUIA: ${data.guia}\n`,
