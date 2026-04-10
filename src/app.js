@@ -34,34 +34,36 @@ let selectedDeliverySession = null;
 async function syncDataFromBackend() {
   try {
     const role = getCurrentUser().rol;
-    const baseRequests = [
+    const canSeeAudit = role === 'admin' || role === 'contable';
+
+    const auditUrl = canSeeAudit ? '/api/auditoria?page=1&page_size=200' : '/api/ops/mi-auditoria';
+
+    const [ventasRes, paquetesRes, cierresRes, sucursalesRes, clientesRes, usuariosRes, auditRes] = await Promise.all([
       api('/api/ops/ventas'),
       api('/api/ops/paquetes'),
       api('/api/ops/cierres'),
-      api('/api/auditoria?page=1&page_size=200'),
       api('/api/ops/sucursales'),
       api('/api/ops/clientes'),
       api('/api/ops/usuarios'),
-    ];
-
-    const [ventasRes, paquetesRes, cierresRes, auditRes, sucursalesRes, clientesRes, usuariosRes] = await Promise.all(baseRequests);
+      api(auditUrl),
+    ]);
 
     db.ventas = ventasRes.data || [];
     db.paquetes = paquetesRes.data || [];
     db.cierres_caja = cierresRes.data || [];
-    db.auditoria = auditRes.data || [];
     db.sucursales = sucursalesRes.data || db.sucursales;
     db.clientes = clientesRes.data || db.clientes;
     db.usuarios = usuariosRes.data || db.usuarios;
+    db.auditoria = auditRes.data || [];
 
-    if (role === 'admin' || role === 'contable') {
+    if (canSeeAudit) {
       const fiscalStatusRes = await api('/api/fiscal/status').catch(() => null);
       if (fiscalStatusRes?.data?.configuracion) {
         db.configuracion_fiscal = { ...db.configuracion_fiscal, ...fiscalStatusRes.data.configuracion };
       }
     }
   } catch (error) {
-    showAlert(`Sync backend: ${error.message}`, 'error');
+    showAlert(`Error de sincronización: ${error.message}`, 'error');
   }
 }
 
@@ -82,10 +84,12 @@ function renderMenu() {
 
 function renderSession() {
   const user = getCurrentUser();
+  const branchName = db.sucursales.find((s) => s.id === user.sucursal_id)?.nombre || '-';
   refs.user.textContent = user.nombre;
   refs.roleLabel.textContent = user.rol.toUpperCase();
   refs.role.value = user.rol;
-  refs.branch.textContent = db.sucursales.find((s) => s.id === user.sucursal_id)?.nombre || '-';
+  refs.branch.textContent = branchName;
+  refs.subtitle.textContent = `${user.nombre} · ${user.rol.toUpperCase()} · ${branchName}`;
 }
 
 async function render() {
@@ -95,7 +99,6 @@ async function render() {
   await syncDataFromBackend();
 
   refs.title.textContent = VIEW_LABELS[currentView] || currentView;
-  refs.subtitle.textContent = canEdit() ? 'Operación activa' : 'Solo lectura';
   refs.content.innerHTML = renderView(currentView);
 
   renderMenu();
@@ -325,6 +328,20 @@ function wireSucursalesPanel() {
       viewState.sucursales.editId = btn.dataset.id;
       viewState.sucursales.showForm = false;
       render();
+    });
+  });
+
+  refs.content.querySelectorAll('[data-action="eliminar-sucursal"]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const nombre = btn.dataset.nombre || btn.dataset.id;
+      if (!confirm(`¿Eliminar la sucursal "${nombre}"? Esta acción no se puede deshacer.`)) return;
+      try {
+        await api(`/api/admin/sucursales/${btn.dataset.id}`, { method: 'DELETE' });
+        showAlert('Sucursal eliminada.', 'success');
+        render();
+      } catch (error) {
+        showAlert(error.message, 'error');
+      }
     });
   });
 
@@ -862,6 +879,28 @@ refs.role.addEventListener('change', async () => {
     showAlert(`Error de autenticación: ${error.message}`, 'error');
   }
 });
+
+// ─── HAMBURGER MENU (MÓVIL) ───────────────────────────────────────────────────
+
+function wireMobileMenu() {
+  const shell = document.getElementById('appShell');
+  const overlay = document.getElementById('sidebarOverlay');
+  const toggle = document.getElementById('menuToggle');
+  const closeBtn = document.getElementById('sidebarClose');
+
+  const openSidebar = () => shell.classList.add('sidebar-open');
+  const closeSidebar = () => shell.classList.remove('sidebar-open');
+
+  toggle?.addEventListener('click', openSidebar);
+  overlay?.addEventListener('click', closeSidebar);
+  closeBtn?.addEventListener('click', closeSidebar);
+
+  document.getElementById('sideMenu')?.addEventListener('click', () => {
+    if (window.innerWidth <= 960) closeSidebar();
+  });
+}
+
+wireMobileMenu();
 
 // ─── INICIO ───────────────────────────────────────────────────────────────────
 

@@ -60,6 +60,22 @@ adminRoutes.put('/sucursales/:id', opsMutationLimiter, requireRole('admin'), for
   return sendOk(res, updated);
 });
 
+adminRoutes.delete('/sucursales/:id', opsMutationLimiter, requireRole('admin'), forbidReadOnlyMutations, async (req, res) => {
+  const { id } = req.params;
+  const existing = await get('SELECT * FROM sucursales WHERE id = ?', [id]);
+  if (!existing) return sendError(res, 404, 'NOT_FOUND', 'Sucursal no encontrada');
+  const cnt = await get(
+    'SELECT COUNT(*) as cnt FROM paquetes WHERE sucursal_origen = ? OR sucursal_destino = ?',
+    [id, id],
+  );
+  if (cnt.cnt > 0) return sendError(res, 409, 'HAS_PACKAGES', `No se puede eliminar: tiene ${cnt.cnt} paquete(s) asociado(s)`);
+  const ucnt = await get('SELECT COUNT(*) as cnt FROM usuarios WHERE sucursal_id = ?', [id]);
+  if (ucnt.cnt > 0) return sendError(res, 409, 'HAS_USERS', `No se puede eliminar: tiene ${ucnt.cnt} usuario(s) asignado(s)`);
+  await run('DELETE FROM sucursales WHERE id = ?', [id]);
+  await writeAudit({ req, modulo: 'sucursales', accion: 'eliminacion_sucursal', entidad: 'sucursales', entidadId: id });
+  return sendOk(res, { deleted: true, id });
+});
+
 // ─── USUARIOS ─────────────────────────────────────────────────────────────────
 
 adminRoutes.get('/usuarios', opsReadLimiter, requireRole('admin'), async (_req, res) => {

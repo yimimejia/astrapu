@@ -255,6 +255,14 @@ opsRoutes.get('/paquetes/:id/movimientos', opsReadLimiter, async (req, res) => {
   res.json({ ok: true, data: rows });
 });
 
+opsRoutes.get('/mi-auditoria', opsReadLimiter, async (req, res) => {
+  const rows = await all(
+    'SELECT * FROM auditoria WHERE usuario_id = ? ORDER BY fecha_hora DESC LIMIT 100',
+    [req.user.id],
+  );
+  res.json({ ok: true, data: rows });
+});
+
 opsRoutes.get('/paquetes/:id', opsReadLimiter, async (req, res) => {
   const row = await get(
     `SELECT p.*, c.nombre as cliente_nombre, c.telefono as cliente_telefono, c.cedula as cliente_cedula

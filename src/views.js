@@ -264,7 +264,8 @@ function panelSucursales(readOnly) {
   const rows = db.sucursales.map((s) => {
     const cnt = db.paquetes.filter((p) => p.sucursal_origen === s.id || p.sucursal_destino === s.id).length;
     const editBtn = !readOnly ? `<button class="btn btn-sm" data-action="editar-sucursal" data-id="${s.id}">Editar</button>` : '';
-    return `<tr><td>${s.nombre}</td><td>${s.provincia}</td><td>${cnt} paquetes</td><td>${editBtn}</td></tr>`;
+    const delBtn = !readOnly && cnt === 0 ? `<button class="btn btn-sm danger" data-action="eliminar-sucursal" data-id="${s.id}" data-nombre="${s.nombre}">Eliminar</button>` : '';
+    return `<tr><td>${s.nombre}</td><td>${s.provincia}</td><td>${cnt} paquetes</td><td style="display:flex;gap:.3rem;flex-wrap:wrap">${editBtn}${delBtn}</td></tr>`;
   }).join('');
 
   const formHtml = (showForm || editId) ? `

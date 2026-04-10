@@ -11,14 +11,17 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qz-tray/2.2.4/qz-tray.js"></script>
   </head>
   <body>
-    <div class="app-shell">
-      <aside class="sidebar">
+    <div class="app-shell" id="appShell">
+      <div id="sidebarOverlay" class="sidebar-overlay"></div>
+
+      <aside class="sidebar" id="sidebar">
         <div class="brand">
           <span class="brand-mark">A</span>
           <div>
             <h1>Astrapu</h1>
             <p>Paquetería interprovincial RD</p>
           </div>
+          <button id="sidebarClose" class="sidebar-close" aria-label="Cerrar menú">✕</button>
         </div>
 
         <label class="role-select">Rol activo
@@ -35,9 +38,10 @@
 
       <main class="main">
         <header class="topbar">
-          <div>
+          <button id="menuToggle" class="menu-toggle" aria-label="Abrir menú">☰</button>
+          <div class="topbar-title">
             <h2 id="viewTitle">Dashboard</h2>
-            <p id="viewSubtitle">Operación activa</p>
+            <span id="viewSubtitle" class="topbar-meta"></span>
           </div>
           <div class="session-cards">
             <article><span>Usuario</span><strong id="sessionUser">-</strong></article>
