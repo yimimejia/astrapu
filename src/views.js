@@ -666,33 +666,42 @@ function panelConfiguracion() {
       <div style="display:flex;flex-direction:column;gap:1.25rem">
         <div>
           <p style="font-size:.8rem;font-weight:600;color:var(--gray-500);margin-bottom:.5rem;text-transform:uppercase;letter-spacing:.04em">Vista previa — Ticket térmico (80mm)</p>
-          <div id="previewTicket" style="background:#fff;border:1px solid var(--gray-300);border-radius:.35rem;padding:.85rem .9rem;max-width:290px;font-family:'Courier New',monospace;font-size:.74rem;line-height:1.5;box-shadow:2px 2px 6px rgba(0,0,0,.07)">
-            <div style="text-align:center;font-weight:900;font-size:1.25em;letter-spacing:.04em" id="pv-nombre">${nombreEmp}</div>
-            <div style="text-align:center;font-size:.9em" id="pv-subtitulo">${subtitulo}</div>
+          <div id="previewTicket" style="background:#fff;border:1px solid var(--gray-300);border-radius:.35rem;padding:.85rem .9rem;max-width:290px;font-family:'Courier New',monospace;font-size:.72rem;line-height:1.5;box-shadow:2px 2px 6px rgba(0,0,0,.07)">
+            <div style="text-align:center;font-weight:900;font-size:1.3em;letter-spacing:.04em" id="pv-nombre">${nombreEmp}</div>
+            <div style="text-align:center;font-size:.88em" id="pv-subtitulo">${subtitulo}</div>
             <div style="text-align:center;font-size:.8em;color:#444;${telRncPrev ? '' : 'display:none'}" id="pv-tel-rnc">${telRncPrev}</div>
-            <div style="border-top:2px solid #222;margin:.4rem 0"></div>
-            <div>GUIA: <b>GUIA-000000001</b></div>
-            <div>Fecha: 10/04/2026 08:35</div>
-            <div>Operador: admin</div>
-            <div>Pago: EFECTIVO</div>
+            <div style="border-top:1px dashed #aaa;margin:.35rem 0"></div>
+            <div style="font-weight:700;font-size:1.05em">Factura#: GUIA-000000001</div>
+            <div>(EFECTIVO)</div>
+            <div>Fecha: 10/04/2026  08:35</div>
+            <div>Vendedor: admin</div>
             <div style="border-top:1px dashed #aaa;margin:.35rem 0"></div>
             <div><b>REMITENTE:</b></div>
-            <div style="padding-left:.5rem">Juan Pérez</div>
-            <div style="padding-left:.5rem">Tel: 809-555-1234</div>
-            <div style="margin-top:.3rem"><b>DESTINO: Santiago Norte</b></div>
-            <div>Origen:  Santo Domingo Centro</div>
+            <div>Juan Pérez</div>
+            <div>Tel: 809-555-1234</div>
             <div style="border-top:1px dashed #aaa;margin:.35rem 0"></div>
-            <div><b>DESCRIPCION DEL PAQUETE:</b></div>
-            <div style="padding-left:.5rem">Documentos importantes</div>
-            <div style="padding-left:.5rem">Color/Empaque: Azul</div>
-            <div style="padding-left:.5rem">Cant: 1 Bulto</div>
+            <div><b>DESTINO:</b></div>
+            <div>Santiago Norte</div>
+            <div>Origen: Santo Domingo Centro</div>
             <div style="border-top:1px dashed #aaa;margin:.35rem 0"></div>
-            <div style="display:flex;justify-content:space-between"><span>Subtotal:</span><span>RD$ 423.73</span></div>
-            <div style="display:flex;justify-content:space-between"><span>ITBIS (18%):</span><span>RD$ 76.27</span></div>
+            <div style="display:grid;grid-template-columns:1fr auto auto auto;gap:0 4px;font-size:.68rem">
+              <span>Cant.</span><span style="text-align:right">Precio</span><span style="text-align:right">ITBIS</span><span style="text-align:right">Total</span>
+              <span style="grid-column:1/-1;border-top:1px dashed #aaa"></span>
+              <span style="grid-column:1/-1">Documentos importantes — Azul</span>
+              <span>1 Bulto</span><span style="text-align:right">423.73</span><span style="text-align:right">76.27</span><span style="text-align:right">500.00</span>
+            </div>
             <div style="border-top:1px dashed #aaa;margin:.35rem 0"></div>
-            <div style="display:flex;justify-content:space-between;font-weight:800;font-size:1.05em"><span>TOTAL:</span><span>RD$ 500.00</span></div>
+            <div style="display:flex;justify-content:space-between"><span>Sub Total:</span><span>$423.73</span></div>
+            <div style="display:flex;justify-content:space-between"><span>Descuento:</span><span>0.00</span></div>
+            <div style="display:flex;justify-content:space-between"><span>Recargo:</span><span>0.00</span></div>
+            <div style="display:flex;justify-content:space-between"><span>ITBIS:</span><span>$76.27</span></div>
+            <div style="border-top:1px dashed #aaa;margin:.35rem 0"></div>
+            <div style="display:flex;justify-content:space-between;font-weight:900;font-size:1.2em"><span>TOTAL</span><span>500.00</span></div>
+            <div style="border-top:1px dashed #aaa;margin:.35rem 0"></div>
+            <div style="display:flex;justify-content:space-between"><span>Pago:</span><span>RD$ 500.00</span></div>
+            <div style="display:flex;justify-content:space-between"><span>Devuelta:</span><span>RD$ 0.00</span></div>
             <div style="border-top:2px solid #222;margin:.4rem 0"></div>
-            <div style="text-align:center;font-size:.88em" id="pv-mensaje">${msgFinal}</div>
+            <div style="text-align:center;font-size:.82em" id="pv-mensaje">${msgFinal}</div>
           </div>
         </div>
 

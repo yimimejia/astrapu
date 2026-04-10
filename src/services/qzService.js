@@ -125,11 +125,12 @@ export function getPrinterConfig() {
 
 function escposTicket(data) {
   const pcfg = db.configuracion_impresoras;
-  // W=42 for 80mm paper with normal font.
-  // Double-height mode (\x1B\x21\x10) keeps the same width but makes chars taller.
-  const W   = 42;
-  const SEP = '-'.repeat(W);
-  const EQ  = '='.repeat(W);
+  // W=42 for 80mm thermal paper (normal font).
+  // BIG (\x1B\x21\x38) = double-width+height so only 21 chars fit per line.
+  const W     = 42;
+  const WBIG  = 21;
+  const SEP   = '-'.repeat(W);
+  const EQ    = '='.repeat(W);
 
   // ESC/POS font modes
   const NORMAL   = '\x1B\x21\x00';           // normal
@@ -143,32 +144,40 @@ function escposTicket(data) {
 
   const nombre   = (pcfg.nombre_empresa || 'ASTRAPU').slice(0, W);
   const sub      = (pcfg.subtitulo      || 'Paquetería Interprovincial RD').slice(0, W);
-  const msgFinal = (pcfg.mensaje_final  || 'Gracias por preferirnos').slice(0, W);
-  const telRnc   = [
-    pcfg.telefono ? `Tel: ${pcfg.telefono}` : '',
-    pcfg.rnc      ? `RNC: ${pcfg.rnc}`      : '',
-  ].filter(Boolean).join('  ').slice(0, W);
+  const msgFinal = (pcfg.mensaje_final  || 'Artículos dejados después de 30 días pierden el derecho a reclamo.').slice(0, W);
+  const telLine  = [
+    pcfg.telefono ? `Telefono: ${pcfg.telefono}` : '',
+  ].filter(Boolean).join('').slice(0, W);
+  const rncLine  = pcfg.rnc ? `RNC: ${pcfg.rnc}`.slice(0, W) : '';
 
   const total    = parseFloat(data.monto) || 0;
   const subtotal = total / 1.18;
   const itbis    = total - subtotal;
-  const rFmt     = (n) => `RD$ ${n.toFixed(2)}`;
+  const fmtNum   = (n) => n.toFixed(2);
+  const rFmt     = (n) => `RD$ ${fmtNum(n)}`;
 
-  // Right-aligned row — same width as normal font (DH doesn't change width)
+  // Right-align a label+value pair within W chars
   const rAlign = (label, val) => {
     const sp = W - label.length - val.length;
     return label + (sp > 0 ? ' '.repeat(sp) : ' ') + val + '\n';
   };
 
-  const wrap = (str, prefix = '  ') => {
+  // Right-align within BIG-mode width (21 double-width chars = 42 normal chars)
+  const rAlignBig = (label, val) => {
+    const sp = WBIG - label.length - val.length;
+    return label + (sp > 0 ? ' '.repeat(sp) : ' ') + val + '\n';
+  };
+
+  // Word-wrap helper
+  const wrap = (str) => {
     const words = String(str || '').split(' ');
     const lines = [];
-    let line = prefix;
+    let line = '';
     for (const w of words) {
-      if ((line + w).length > W) { lines.push(line.trimEnd()); line = prefix + w + ' '; }
-      else { line += w + ' '; }
+      if ((line + (line ? ' ' : '') + w).length > W) { lines.push(line); line = w; }
+      else { line = line ? line + ' ' + w : w; }
     }
-    if (line.trim()) lines.push(line.trimEnd());
+    if (line) lines.push(line);
     return lines.join('\n') + '\n';
   };
 
@@ -176,84 +185,132 @@ function escposTicket(data) {
     ? new Date(data.fecha).toLocaleString('es-DO', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
     : new Date().toLocaleString('es-DO', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
+  // Items table: columns [unit+desc 16] [precio 9] [itbis 8] [total 9] = 42
+  const itemHeader = 'Cant.'.padEnd(16) + 'Precio'.padStart(9) + 'ITBIS'.padStart(8) + 'Total'.padStart(9);
+  const itemRow    = '1 Bulto'.padEnd(16) + fmtNum(subtotal).padStart(9) + fmtNum(itbis).padStart(8) + fmtNum(total).padStart(9);
+
   return [
-    '\x1B\x40',                              // initialize printer
-    CTR, BIG, `${nombre}\n`,                 // company name — max size, centered
-    DH,  `${sub}\n`,                         // subtitle — double height, centered
-    NORMAL, telRnc ? `${telRnc}\n` : '',     // tel/RNC — normal, centered
-    `${EQ}\n`,
+    '\x1B\x40',                                    // initialize
+
+    // ── HEADER ──
+    CTR, BIG, `${nombre}\n`,                       // company name: max size centered
+    NORMAL, `${sub}\n`,                            // subtitle: normal centered
+    telLine  ? `${telLine}\n`  : '',
+    rncLine  ? `${rncLine}\n`  : '',
+    `${SEP}\n`,
+
+    // ── INVOICE INFO ──
     LEFT,
-    DH, `GUIA: ${data.guia}\n`,              // guide number — double height
-    NORMAL, `Fecha: ${fecha}\n`,
-    data.operador ? `Operador: ${data.operador}\n` : '',
-    `Pago: ${data.metodo_pago || 'EFECTIVO'}\n`,
-    `${SEP}\n`,
-    BOLD_DH, 'REMITENTE:\n',                 // section header — bold + double height
-    DH, `  ${String(data.cliente || '').slice(0, W - 2)}\n`,
-    data.telefono_cliente ? DH + `  Tel: ${data.telefono_cliente}\n` : '',
-    '\n',
-    BOLD_DH, `DESTINO:\n`,
-    DH, `  ${String(data.destino || '-').slice(0, W - 2)}\n`,
-    data.origen ? NORMAL + `  Origen: ${String(data.origen).slice(0, W - 10)}\n` : '',
-    `${SEP}\n`,
-    BOLD_DH, 'DESCRIPCION DEL PAQUETE:\n',
-    DH, wrap(data.descripcion || 'Paquete'),
-    data.color ? `  Color/Empaque: ${String(data.color).slice(0, 24)}\n` : '',
-    `  Cant: 1 Bulto\n`,
-    `${SEP}\n`,
+    DH, `Factura#: ${data.guia}\n`,               // invoice number: double-height
     NORMAL,
-    rAlign('Subtotal:', rFmt(subtotal)),
-    rAlign('ITBIS (18%):', rFmt(itbis)),
+    `(${data.metodo_pago || 'EFECTIVO'})\n`,
+    `Fecha: ${fecha}\n`,
+    data.operador ? `Vendedor: ${data.operador}\n` : '',
     `${SEP}\n`,
-    BIG, BOLD_ON,
-    rAlign('TOTAL:', rFmt(total)),
-    NORMAL, BOLD_OFF,
+
+    // ── CLIENTE / REMITENTE ──
+    BOLD_ON, 'REMITENTE:\n', BOLD_OFF,
+    `${String(data.cliente || '-').slice(0, W)}\n`,
+    data.telefono_cliente ? `Tel: ${data.telefono_cliente}\n` : '',
+    `${SEP}\n`,
+
+    // ── DESTINO ──
+    BOLD_ON, 'DESTINO:\n', BOLD_OFF,
+    `${String(data.destino || '-').slice(0, W)}\n`,
+    data.origen ? `Origen: ${String(data.origen).slice(0, W - 8)}\n` : '',
+    `${SEP}\n`,
+
+    // ── ITEMS TABLE ──
+    `${itemHeader}\n`,
+    `${SEP}\n`,
+    wrap(data.descripcion || 'Paquete'),
+    data.color ? `Color/Empaque: ${String(data.color).slice(0, W - 15)}\n` : '',
+    `${itemRow}\n`,
+    `${SEP}\n`,
+
+    // ── SUBTOTALS ──
+    rAlign('Sub Total:', `$${fmtNum(subtotal)}`),
+    rAlign('Descuento:', '0.00'),
+    rAlign('Recargo:', '0.00'),
+    rAlign('ITBIS:', `$${fmtNum(itbis)}`),
+    `${SEP}\n`,
+
+    // ── TOTAL: big font (W=21) ──
+    BIG,
+    rAlignBig('TOTAL', fmtNum(total)),
+    NORMAL,
     `${EQ}\n`,
-    CTR, DH, `${msgFinal}\n`,
+
+    // ── PAYMENT ──
+    rAlign('Pago:', rFmt(total)),
+    rAlign('Devuelta:', 'RD$ 0.00'),
+    `${EQ}\n`,
+
+    // ── FOOTER ──
+    CTR,
+    `\n${msgFinal}\n`,
     NORMAL,
     '\n\n',
-    '\x1D\x56\x41',                          // cut paper
+    '\x1D\x56\x41',                                // cut paper
   ].join('');
 }
 
 function htmlLabel(data) {
-  const pcfg   = db.configuracion_impresoras;
-  const nombre = pcfg.nombre_empresa || 'ASTRAPU';
-  const sub    = pcfg.subtitulo      || 'Paquetería Interprovincial RD';
-  const tel    = pcfg.telefono ? `Tel: ${pcfg.telefono}` : '';
-  const rnc    = pcfg.rnc      ? `RNC: ${pcfg.rnc}`      : '';
-  const guia   = data.guia   || '';
-  const dest   = data.destino || '-';
-  const orig   = data.origen  || '';
+  const pcfg    = db.configuracion_impresoras;
+  const nombre  = pcfg.nombre_empresa || 'ASTRAPU';
+  const sub     = pcfg.subtitulo      || 'Paquetería Interprovincial RD';
+  const tel     = pcfg.telefono ? `Tel: ${pcfg.telefono}` : '';
+  const rnc     = pcfg.rnc      ? `RNC: ${pcfg.rnc}`      : '';
+  const guia    = data.guia    || '';
+  const dest    = data.destino || '-';
+  const orig    = data.origen  || '';
   const barcode = data.codigo_barras || data.guia || '';
+
+  // Simulate a Code 128-style barcode as alternating thin/wide bars using CSS
+  // (real barcode font not available, but QZ Tray renders this fine on screen)
+  const barsHtml = (() => {
+    let bars = '';
+    for (let i = 0; i < barcode.length + 10; i++) {
+      const w = (i % 3 === 0) ? 3 : 1;
+      const fill = (i % 2 === 0) ? '#000' : '#fff';
+      bars += `<span style="display:inline-block;width:${w}px;height:28px;background:${fill};vertical-align:top"></span>`;
+    }
+    return bars;
+  })();
 
   return `<!DOCTYPE html>
 <html><head><meta charset="utf-8">
 <style>
-  *{margin:0;padding:0;box-sizing:border-box}
-  body{font-family:Arial,sans-serif;width:148mm;height:100mm;padding:4mm;
-       border:1px solid #000;background:#fff;display:flex;flex-direction:column;gap:2mm}
-  .top{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:1px solid #000;padding-bottom:2mm}
-  .brand{flex:1}
-  .brand h1{font-size:18pt;font-weight:900;line-height:1}
-  .brand p{font-size:7pt;color:#444}
-  .qr{width:22mm;height:22mm;display:flex;align-items:center;justify-content:center;border:1px dashed #ccc;font-size:6pt;color:#999;text-align:center}
-  .mid{display:grid;grid-template-columns:1fr 1fr;gap:2mm;flex:1}
-  .field label{font-size:6pt;font-weight:700;text-transform:uppercase;color:#666;display:block}
-  .field span{font-size:10pt;font-weight:700;display:block;line-height:1.2}
-  .field.dest span{font-size:13pt;font-weight:900;color:#000}
-  .bar{text-align:center;border-top:1px solid #000;padding-top:1.5mm}
-  .bartext{font-size:8pt;font-weight:700;letter-spacing:1px;font-family:monospace}
-  .guia-big{font-size:14pt;font-weight:900;letter-spacing:1px}
+  @page { size: A4 portrait; margin: 8mm; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: Arial, sans-serif; background: #fff; }
+  .label {
+    width: 130mm; border: 2px solid #000;
+    padding: 3mm 4mm; display: flex; flex-direction: column; gap: 2mm;
+  }
+  .top { display:flex; justify-content:space-between; align-items:flex-start;
+         border-bottom:1px solid #000; padding-bottom:2mm; margin-bottom:1mm; }
+  .brand h1 { font-size:15pt; font-weight:900; line-height:1.1; }
+  .brand p  { font-size:7pt; color:#444; line-height:1.4; }
+  .guia     { font-size:13pt; font-weight:900; white-space:nowrap; text-align:right; }
+  .mid      { display:grid; grid-template-columns:1.5fr 1fr; gap:2mm; }
+  .field label { font-size:6pt; font-weight:700; text-transform:uppercase;
+                 color:#555; display:block; }
+  .field.dest span { font-size:12pt; font-weight:900; line-height:1.2; }
+  .field span { font-size:9pt; font-weight:700; display:block; line-height:1.2; }
+  .barwrap { border-top:1px solid #000; padding-top:2mm; text-align:center; }
+  .barcode { display:inline-flex; height:28px; gap:0; }
+  .barnum  { font-size:7pt; letter-spacing:1px; font-family:monospace; margin-top:1mm; }
 </style>
 </head><body>
+<div class="label">
   <div class="top">
     <div class="brand">
       <h1>${nombre}</h1>
       <p>${sub}</p>
       ${tel ? `<p>${tel}${rnc ? '  ' + rnc : ''}</p>` : (rnc ? `<p>${rnc}</p>` : '')}
     </div>
-    <div class="guia-big">${guia}</div>
+    <div class="guia">${guia}</div>
   </div>
   <div class="mid">
     <div class="field dest">
@@ -265,10 +322,11 @@ function htmlLabel(data) {
       <span>${orig || '—'}</span>
     </div>
   </div>
-  <div class="bar">
-    <div class="bartext">|||||||||||||||||||||||||||||||||||||||||||||||</div>
-    <div style="font-size:7pt;letter-spacing:1.5px;font-family:monospace">${barcode}</div>
+  <div class="barwrap">
+    <div class="barcode">${barsHtml}</div>
+    <div class="barnum">${barcode}</div>
   </div>
+</div>
 </body></html>`;
 }
 
@@ -305,11 +363,11 @@ async function rawPrint(printerName, payload) {
 async function pixelPrint(printerName, htmlContent) {
   if (!state.connected || !window.qz) return { ok: false, error: 'QZ no conectado' };
   try {
+    // Let the printer use its own paper size (A4 portrait by default).
+    // The @page CSS in the HTML controls margins; the label box controls the printed area.
     const config = window.qz.configs.create(printerName, {
-      units: 'mm',
-      size: { width: 148, height: 105 },
-      margins: { top: 0, right: 0, bottom: 0, left: 0 },
       colorType: 'blackwhite',
+      copies: 1,
     });
     await window.qz.print(config, [{ type: 'pixel', format: 'html', flavor: 'plain', data: htmlContent }]);
     return { ok: true };

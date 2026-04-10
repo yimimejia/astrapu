@@ -1098,16 +1098,37 @@ function wirePrinters() {
   refs.content.querySelector('[data-action="test-termica"]')?.addEventListener('click', async () => {
     feedback.textContent = 'Enviando prueba térmica...';
     feedback.className = 'hint';
-    const r = await printThermalTicket({ guia: 'TEST-THERMAL', cliente: 'Prueba Astrapu', monto: '0.00' });
-    feedback.textContent = r.ok ? '✓ Prueba térmica enviada correctamente.' : `✗ ${r.error}`;
+    const pkt = db.paquetes[0];
+    const testTicket = pkt ? {
+      guia:             pkt.guia,
+      cliente:          pkt.cliente_nombre || db.clientes.find((c) => c.id === pkt.cliente_id)?.nombre || 'Cliente Prueba',
+      monto:            pkt.monto || '500',
+      telefono_cliente: pkt.telefono_destinatario || '',
+      descripcion:      pkt.descripcion || 'Paquete de prueba',
+      color:            pkt.color_empaque || '',
+      destino:          db.sucursales.find((s) => s.id === pkt.sucursal_destino)?.nombre || 'Sucursal destino',
+      origen:           db.sucursales.find((s) => s.id === pkt.sucursal_origen)?.nombre  || 'Sucursal origen',
+      operador:         db.usuarios.find((u) => u.id === pkt.usuario_id)?.username || 'admin',
+      fecha:            pkt.created_at,
+      metodo_pago:      'EFECTIVO',
+    } : { guia: 'TEST-THERMAL', cliente: 'Prueba Astrapu', monto: '590', descripcion: 'Documentos varios', destino: 'Santiago Norte', origen: 'Santo Domingo Centro', operador: 'admin', metodo_pago: 'EFECTIVO' };
+    const r = await printThermalTicket(testTicket);
+    feedback.textContent = r.ok ? `✓ Prueba térmica enviada (${testTicket.guia}).` : `✗ ${r.error}`;
     feedback.className = `hint ${r.ok ? 'success' : 'error'}`;
   });
 
   refs.content.querySelector('[data-action="test-adhesiva"]')?.addEventListener('click', async () => {
     feedback.textContent = 'Enviando prueba de etiqueta...';
     feedback.className = 'hint';
-    const r = await printAdhesiveLabel({ guia: 'TEST-LABEL', destino: 'SUCURSAL TEST', codigo_barras: 'ASTRAPU-TEST' });
-    feedback.textContent = r.ok ? '✓ Prueba de etiqueta enviada correctamente.' : `✗ ${r.error}`;
+    const pkt = db.paquetes[0];
+    const testLabel = pkt ? {
+      guia:          pkt.guia,
+      destino:       db.sucursales.find((s) => s.id === pkt.sucursal_destino)?.nombre || 'Sucursal destino',
+      origen:        db.sucursales.find((s) => s.id === pkt.sucursal_origen)?.nombre  || 'Sucursal origen',
+      codigo_barras: pkt.codigo_barras || pkt.guia,
+    } : { guia: 'TEST-LABEL', destino: 'SUCURSAL TEST', origen: 'Santo Domingo', codigo_barras: 'ASTRAPU-000000001' };
+    const r = await printAdhesiveLabel(testLabel);
+    feedback.textContent = r.ok ? `✓ Prueba de etiqueta enviada (${testLabel.guia}).` : `✗ ${r.error}`;
     feedback.className = `hint ${r.ok ? 'success' : 'error'}`;
   });
 
