@@ -124,33 +124,42 @@ export function getPrinterConfig() {
 // ─── PLANTILLAS DE IMPRESIÓN ──────────────────────────────────────────────────
 
 function escposTicket(data) {
-  const line = (txt) => txt.padEnd(32).slice(0, 32);
+  const pcfg = db.configuracion_impresoras;
+  const nombre   = (pcfg.nombre_empresa || 'ASTRAPU').slice(0, 32);
+  const sub      = (pcfg.subtitulo      || 'Paquetería Interprovincial RD').slice(0, 32);
+  const tel      = pcfg.telefono ? pcfg.telefono.slice(0, 32) : '';
+  const msgFinal = (pcfg.mensaje_final  || 'Gracias por preferirnos').slice(0, 32);
   return [
     '\x1B\x40',
     '\x1B\x61\x01',
     '\x1B\x21\x30',
-    'ASTRAPU\n',
+    `${nombre}\n`,
     '\x1B\x21\x00',
-    'Paqueteria Interprovincial RD\n',
+    `${sub}\n`,
+    tel ? `${tel}\n` : '',
     '--------------------------------\n',
     `GUIA: ${data.guia}\n`,
     `CLIENTE: ${data.cliente}\n`,
     `MONTO: RD$ ${data.monto}\n`,
     '--------------------------------\n',
-    'Gracias por preferirnos\n\n\n',
+    `${msgFinal}\n\n\n`,
     '\x1D\x56\x41',
   ].join('');
 }
 
 function zplLabel(data) {
+  const pcfg = db.configuracion_impresoras;
+  const nombre = (pcfg.nombre_empresa || 'ASTRAPU').slice(0, 40);
+  const sub    = (pcfg.subtitulo      || '').slice(0, 40);
   return [
     '^XA',
     '^CF0,40',
-    `^FO40,30^FDASTRAPU^FS`,
+    `^FO40,30^FD${nombre}^FS`,
+    sub ? `^CF0,24^FO40,80^FD${sub}^FS` : '',
     `^CF0,28`,
-    `^FO40,90^FDGUIA: ${data.guia}^FS`,
-    `^FO40,130^FDDESTINO: ${data.destino}^FS`,
-    `^FO40,180^BY2^BCN,80,Y,N,N^FD${data.codigo_barras || data.guia}^FS`,
+    `^FO40,${sub ? 120 : 90}^FDGUIA: ${data.guia}^FS`,
+    `^FO40,${sub ? 160 : 130}^FDDESTINO: ${data.destino}^FS`,
+    `^FO40,${sub ? 210 : 180}^BY2^BCN,80,Y,N,N^FD${data.codigo_barras || data.guia}^FS`,
     '^XZ',
   ].join('\n');
 }

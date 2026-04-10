@@ -626,6 +626,44 @@ function wireConfiguracion() {
       if (feedback) feedback.textContent = error.message;
     }
   });
+
+  const printForm = document.getElementById('formPrintConfig');
+  if (!printForm) return;
+
+  const fields = {
+    pcNombreEmpresa: ['pv-nombre', 'pv-etq-nombre'],
+    pcSubtitulo:     ['pv-subtitulo', 'pv-etq-subtitulo'],
+    pcTelefono:      ['pv-telefono'],
+    pcMensajeFinal:  ['pv-mensaje'],
+  };
+
+  const syncPreview = () => {
+    for (const [inputId, targetIds] of Object.entries(fields)) {
+      const val = document.getElementById(inputId)?.value || '';
+      for (const tid of targetIds) {
+        const el = document.getElementById(tid);
+        if (el) el.textContent = val;
+      }
+    }
+    const telEl = document.getElementById('pv-telefono');
+    if (telEl) telEl.style.display = telEl.textContent.trim() ? '' : 'none';
+  };
+
+  printForm.addEventListener('input', syncPreview);
+  syncPreview();
+
+  printForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const fd = new FormData(printForm);
+    const pcfg = getPrinterConfig();
+    pcfg.nombre_empresa = fd.get('nombre_empresa') || pcfg.nombre_empresa;
+    pcfg.subtitulo      = fd.get('subtitulo')      || pcfg.subtitulo;
+    pcfg.telefono       = fd.get('telefono')        || '';
+    pcfg.mensaje_final  = fd.get('mensaje_final')   || pcfg.mensaje_final;
+    setPrinterConfig(pcfg.termica, pcfg.adhesiva);
+    const feedback = document.getElementById('printConfigFeedback');
+    if (feedback) { feedback.textContent = '✓ Texto guardado localmente.'; feedback.className = 'hint success'; }
+  });
 }
 
 // ─── VENTAS PANEL ─────────────────────────────────────────────────────────────

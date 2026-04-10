@@ -579,6 +579,14 @@ function panelFiscal(readOnly) {
 
 function panelConfiguracion() {
   const cfg = db.configuracion_fiscal || {};
+  const pcfg = getPrinterConfig();
+  const esc = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+  const nombreEmp  = esc(pcfg.nombre_empresa  || 'ASTRAPU');
+  const subtitulo  = esc(pcfg.subtitulo       || 'Paquetería Interprovincial RD');
+  const telefono   = esc(pcfg.telefono        || '');
+  const msgFinal   = esc(pcfg.mensaje_final   || 'Gracias por preferirnos');
+
   return `<section class="panel">
     <header class="panel-header"><h3>Configuración general</h3></header>
     <form id="formConfigGeneral" class="form-grid">
@@ -603,6 +611,62 @@ function panelConfiguracion() {
         <div><span>Clientes registrados</span><span>${db.clientes.length}</span></div>
       </div>
     </section>
+  </section>
+
+  <section class="panel" style="margin-top:0">
+    <header class="panel-header"><h3>🖨️ Texto de impresión</h3><span class="hint" style="margin-left:.75rem;font-size:.8rem">Se aplica al ticket y la etiqueta</span></header>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;align-items:start">
+
+      <form id="formPrintConfig" class="form-grid" style="gap:.65rem">
+        <label style="grid-column:1/-1">Nombre de la empresa (cabecera)
+          <input id="pcNombreEmpresa" name="nombre_empresa" value="${nombreEmp}" placeholder="ASTRAPU" />
+        </label>
+        <label style="grid-column:1/-1">Subtítulo
+          <input id="pcSubtitulo" name="subtitulo" value="${subtitulo}" placeholder="Paquetería Interprovincial RD" />
+        </label>
+        <label>Teléfono
+          <input id="pcTelefono" name="telefono" value="${telefono}" placeholder="809-000-0000" />
+        </label>
+        <label>Mensaje final del ticket
+          <input id="pcMensajeFinal" name="mensaje_final" value="${msgFinal}" placeholder="Gracias por preferirnos" />
+        </label>
+        <div class="actions full" style="margin-top:.25rem">
+          <button class="btn primary" type="submit">💾 Guardar texto</button>
+        </div>
+        <div id="printConfigFeedback" class="hint"></div>
+      </form>
+
+      <div style="display:flex;flex-direction:column;gap:1.25rem">
+        <div>
+          <p style="font-size:.8rem;font-weight:600;color:var(--gray-500);margin-bottom:.5rem;text-transform:uppercase;letter-spacing:.04em">Vista previa — Ticket térmico (80mm)</p>
+          <div id="previewTicket" style="background:#fff;border:1px solid var(--gray-300);border-radius:.35rem;padding:.85rem .9rem;max-width:270px;font-family:'Courier New',monospace;font-size:.78rem;line-height:1.55;box-shadow:2px 2px 6px rgba(0,0,0,.07)">
+            <div style="text-align:center;font-weight:800;font-size:1.05em;letter-spacing:.04em" id="pv-nombre">${nombreEmp}</div>
+            <div style="text-align:center;font-size:.88em" id="pv-subtitulo">${subtitulo}</div>
+            <div style="text-align:center;font-size:.82em;color:#555" id="pv-telefono">${telefono}</div>
+            <div style="border-top:1px dashed #aaa;margin:.45rem 0"></div>
+            <div>GUIA: <b>GUIA-000000001</b></div>
+            <div>CLIENTE: Juan Pérez</div>
+            <div>MONTO: <b>RD$ 500.00</b></div>
+            <div style="border-top:1px dashed #aaa;margin:.45rem 0"></div>
+            <div style="text-align:center;font-size:.88em" id="pv-mensaje">${msgFinal}</div>
+          </div>
+        </div>
+
+        <div>
+          <p style="font-size:.8rem;font-weight:600;color:var(--gray-500);margin-bottom:.5rem;text-transform:uppercase;letter-spacing:.04em">Vista previa — Etiqueta adhesiva</p>
+          <div id="previewEtiqueta" style="background:#fff;border:2px solid #222;border-radius:.25rem;padding:.75rem 1rem;max-width:320px;font-family:'Courier New',monospace;font-size:.82rem;line-height:1.6">
+            <div style="font-weight:800;font-size:1.15em;letter-spacing:.05em" id="pv-etq-nombre">${nombreEmp}</div>
+            <div style="font-size:.85em;color:#444" id="pv-etq-subtitulo">${subtitulo}</div>
+            <div style="border-top:1px solid #ccc;margin:.4rem 0"></div>
+            <div>GUIA: <b>GUIA-000000001</b></div>
+            <div>DESTINO: <b>Santiago Norte</b></div>
+            <div style="height:52px;background:repeating-linear-gradient(90deg,#000 0,#000 2px,#fff 2px,#fff 6px);margin:.55rem 0;border-radius:2px;width:85%"></div>
+            <div style="font-size:.72em;text-align:center;letter-spacing:.12em">GUIA-000000001</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
   </section>`;
 }
 

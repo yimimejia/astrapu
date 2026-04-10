@@ -58,7 +58,14 @@ export const db = {
       activa: true,
     },
   ],
-  configuracion_impresoras: { termica: null, adhesiva: null },
+  configuracion_impresoras: {
+    termica: null,
+    adhesiva: null,
+    nombre_empresa: 'ASTRAPU',
+    subtitulo: 'Paquetería Interprovincial RD',
+    telefono: '',
+    mensaje_final: 'Gracias por preferirnos',
+  },
   historial_impresion: [],
   rutas_estadisticas: {},
 };
