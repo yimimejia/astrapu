@@ -59,7 +59,7 @@ export async function connectQZ() {
       fetchCertificate().then(resolve).catch(reject);
     });
 
-    qz.security.setSignaturePromise((toSign) => {
+    qz.security.setSignaturePromise(async (toSign) => {
       return signPayload(toSign);
     });
 
