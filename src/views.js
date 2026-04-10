@@ -676,14 +676,14 @@ function panelConfiguracion() {
 
         <div>
           <p style="font-size:.8rem;font-weight:600;color:var(--gray-500);margin-bottom:.5rem;text-transform:uppercase;letter-spacing:.04em">Vista previa — Etiqueta adhesiva</p>
-          <div id="previewEtiqueta" style="background:#fff;border:2px solid #222;border-radius:.25rem;padding:.75rem 1rem;max-width:320px;font-family:'Courier New',monospace;font-size:.82rem;line-height:1.6">
-            <div style="font-weight:800;font-size:1.15em;letter-spacing:.05em" id="pv-etq-nombre">${nombreEmp}</div>
+          <div id="previewEtiqueta" style="background:#fff;border:2px solid #222;border-radius:.25rem;padding:.85rem 1rem;max-width:320px;font-family:'Courier New',monospace;font-size:.82rem;line-height:1.6;text-align:center">
+            <div style="font-weight:900;font-size:1.2em;letter-spacing:.05em" id="pv-etq-nombre">${nombreEmp}</div>
             <div style="font-size:.85em;color:#444" id="pv-etq-subtitulo">${subtitulo}</div>
-            <div style="border-top:1px solid #ccc;margin:.4rem 0"></div>
+            <div style="border-top:1px solid #ccc;margin:.45rem 0"></div>
             <div>GUIA: <b>GUIA-000000001</b></div>
             <div>DESTINO: <b>Santiago Norte</b></div>
-            <div style="height:52px;background:repeating-linear-gradient(90deg,#000 0,#000 2px,#fff 2px,#fff 6px);margin:.55rem 0;border-radius:2px;width:85%"></div>
-            <div style="font-size:.72em;text-align:center;letter-spacing:.12em">GUIA-000000001</div>
+            <div style="height:52px;background:repeating-linear-gradient(90deg,#000 0,#000 2px,#fff 2px,#fff 6px);margin:.6rem auto;border-radius:2px;width:90%"></div>
+            <div style="font-size:.72em;letter-spacing:.12em">GUIA-000000001</div>
           </div>
         </div>
       </div>

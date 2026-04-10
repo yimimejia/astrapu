@@ -211,20 +211,22 @@ function escposTicket(data) {
 }
 
 function zplLabel(data) {
-  const pcfg = db.configuracion_impresoras;
+  const pcfg  = db.configuracion_impresoras;
   const nombre = (pcfg.nombre_empresa || 'ASTRAPU').slice(0, 40);
   const sub    = (pcfg.subtitulo      || '').slice(0, 40);
-  return [
-    '^XA',
-    '^CF0,40',
-    `^FO40,30^FD${nombre}^FS`,
-    sub ? `^CF0,24^FO40,80^FD${sub}^FS` : '',
-    `^CF0,28`,
-    `^FO40,${sub ? 120 : 90}^FDGUIA: ${data.guia}^FS`,
-    `^FO40,${sub ? 160 : 130}^FDDESTINO: ${data.destino}^FS`,
-    `^FO40,${sub ? 210 : 180}^BY2^BCN,80,Y,N,N^FD${data.codigo_barras || data.guia}^FS`,
-    '^XZ',
-  ].join('\n');
+  const LW     = 800;
+  const c      = (y, fs, txt) => `^FO0,${y}^FB${LW},1,,C^CF0,${fs}^FD${txt}^FS`;
+  let y = 30;
+  const lines = ['^XA', '^PW800'];
+  lines.push(c(y, 48, nombre)); y += 60;
+  if (sub) { lines.push(c(y, 28, sub)); y += 40; }
+  lines.push(`^FO60,${y}^GB680,2,2^FS`); y += 14;
+  lines.push(c(y, 32, `GUIA: ${data.guia}`)); y += 44;
+  lines.push(c(y, 28, `DESTINO: ${data.destino}`)); y += 38;
+  lines.push(`^FO100,${y}^BY3^BCN,90,N,N,N^FD${data.codigo_barras || data.guia}^FS`); y += 110;
+  lines.push(c(y, 22, data.codigo_barras || data.guia));
+  lines.push('^XZ');
+  return lines.join('\n');
 }
 
 async function rawPrint(printerName, payload) {
