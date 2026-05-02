@@ -201,18 +201,18 @@ body {
   text-align: left;
   cursor: pointer;
   font: inherit;
-  font-size: .85rem;
+  font-size: .88rem;
   font-weight: 500;
-  color: rgba(255,255,255,.6);
+  color: rgba(255,255,255,.92);
   width: 100%;
   transition: background var(--tx), color var(--tx);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.menu-item:hover  { background: rgba(255,255,255,.08); color: rgba(255,255,255,.9); }
+.menu-item:hover  { background: rgba(255,255,255,.1); color: #fff; }
 .menu-item.active {
-  background: rgba(255,255,255,.12);
+  background: linear-gradient(90deg, rgba(96,165,250,.22), rgba(96,165,250,.06));
   color: #fff;
   font-weight: 600;
   box-shadow: inset 3px 0 0 var(--brand-300);
@@ -1082,24 +1082,67 @@ details[open] summary::before { transform: rotate(90deg); }
   gap: .05rem;
 }
 .suc-info strong {
-  font-size: .84rem;
-  font-weight: 600;
+  font-size: .9rem;
+  font-weight: 700;
   color: #fff;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .suc-info span {
-  font-size: .72rem;
-  color: rgba(255,255,255,.45);
+  font-size: .74rem;
+  color: rgba(255,255,255,.7);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .suc-branch {
   color: var(--brand-200) !important;
-  font-size: .7rem !important;
+  font-size: .72rem !important;
+  font-weight: 500;
 }
+
+/* Super admin role switcher */
+.super-admin-switch {
+  padding: .7rem 1rem .85rem;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+  background: rgba(245,158,11,.08);
+  flex-shrink: 0;
+}
+.super-admin-switch .sas-label {
+  display: flex;
+  align-items: center;
+  gap: .35rem;
+  font-size: .65rem;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: #fbbf24;
+  margin-bottom: .4rem;
+}
+.super-admin-switch .sas-label::before {
+  content: "★";
+  font-size: .8rem;
+}
+.super-admin-switch select {
+  width: 100%;
+  background: rgba(255,255,255,.08);
+  border: 1px solid rgba(251,191,36,.35);
+  border-radius: var(--radius-sm);
+  color: #fff;
+  padding: .5rem .65rem;
+  font: inherit;
+  font-size: .85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color var(--tx), background var(--tx);
+}
+.super-admin-switch select:focus {
+  outline: none;
+  border-color: #fbbf24;
+  background: rgba(255,255,255,.12);
+}
+.super-admin-switch select option { background: var(--brand-800); color: #fff; }
 .logout-btn {
   flex-shrink: 0;
   width: 30px; height: 30px;

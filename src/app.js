@@ -1,6 +1,6 @@
 import { MENUS, VIEW_LABELS } from './constants.js';
 import { db } from './data/store.js';
-import { loginAs, logout, getCurrentUser, getRoleMenu, canEdit, getStoredUser, isLoggedIn } from './services/authService.js';
+import { loginAs, logout, getCurrentUser, getRoleMenu, canEdit, getStoredUser, isLoggedIn, isSuperAdmin, setSimulatedRole, getSimulatedRole } from './services/authService.js';
 import { logAudit } from './services/auditService.js';
 import { connectQZ, disconnectQZ, getPrinters, setPrinterConfig, getPrinterConfig, printThermalTicket, printAdhesiveLabel } from './services/qzService.js';
 import { printSaleDocuments } from './services/printService.js';
@@ -98,10 +98,12 @@ function renderSession() {
   const user = getCurrentUser();
   if (!user) return;
   const branchName = db.sucursales.find((s) => s.id === user.sucursal_id)?.nombre || '-';
+  const simulating = !!getSimulatedRole();
+  const roleLabel = simulating ? `${user.rol.toUpperCase()} (simulado)` : user.rol.toUpperCase();
   refs.user.textContent = user.nombre;
-  refs.roleLabel.textContent = user.rol.toUpperCase();
+  refs.roleLabel.textContent = roleLabel;
   refs.branch.textContent = branchName;
-  refs.subtitle.textContent = `${user.nombre} · ${user.rol.toUpperCase()} · ${branchName}`;
+  refs.subtitle.textContent = `${user.nombre} · ${roleLabel} · ${branchName}`;
 
   // Sidebar user card
   const avatarEl = document.getElementById('sidebarAvatar');
@@ -110,8 +112,20 @@ function renderSession() {
   const branchEl = document.getElementById('sidebarUserBranch');
   if (avatarEl) avatarEl.textContent = (user.nombre || user.username || '?')[0].toUpperCase();
   if (nameEl)   nameEl.textContent   = user.nombre || user.username;
-  if (roleEl)   roleEl.textContent   = user.rol.toUpperCase();
+  if (roleEl)   roleEl.textContent   = roleLabel;
   if (branchEl) branchEl.textContent = branchName;
+
+  // Super admin role switcher visibility + value
+  const sw = document.getElementById('superAdminSwitch');
+  const sel = document.getElementById('superRoleSelect');
+  if (sw && sel) {
+    if (isSuperAdmin()) {
+      sw.style.display = '';
+      sel.value = user.rol;
+    } else {
+      sw.style.display = 'none';
+    }
+  }
 }
 
 async function render() {
@@ -1150,6 +1164,18 @@ document.getElementById('logoutBtn')?.addEventListener('click', () => {
   logAudit({ modulo: 'auth', accion: 'logout', entidad: 'usuarios', entidad_id: getCurrentUser()?.id });
   logout();
   showLoginScreen();
+});
+
+// ─── SUPER ADMIN ROLE SWITCHER ────────────────────────────────────────────────
+
+document.getElementById('superRoleSelect')?.addEventListener('change', (e) => {
+  if (!isSuperAdmin()) return;
+  const newRole = e.target.value;
+  setSimulatedRole(newRole);
+  currentView = defaultViewByRole[newRole] || 'dashboard';
+  viewState.paquetes.selectedId = null;
+  viewState.cuadres.selectedId = null;
+  render();
 });
 
 // ─── HAMBURGER MENU (MÓVIL) ───────────────────────────────────────────────────
