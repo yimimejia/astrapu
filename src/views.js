@@ -930,6 +930,7 @@ function panelEscaneo(mode) {
   return `<section class="panel">
     <header class="panel-header">
       <h3>${VIEW_LABELS[isEnviar ? 'enviar_paquetes' : 'recibir_paquetes']}</h3>
+      <span class="scan-queue-pill" id="scanQueuePill" style="display:none">+0 en cola</span>
       <span class="scan-counter-pill" id="scanCounterPill">0 escaneados</span>
     </header>
     <div class="scan-zone scan-zone-big" id="scanZone">

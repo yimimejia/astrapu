@@ -642,6 +642,14 @@ tr:last-child td { border-bottom: none; }
   border-radius: 999px;
   margin-left: auto;
 }
+.scan-queue-pill {
+  background: #fde68a;
+  color: #854d0e;
+  font-size: .82rem;
+  font-weight: 700;
+  padding: .25rem .7rem;
+  border-radius: 999px;
+}
 
 /* Last scan card — large readout for outdoor visibility */
 .scan-last {

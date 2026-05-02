@@ -836,6 +836,8 @@ function wireEnvioForm() {
 
 let scanCounter = 0;
 let scanBusy = false;
+const scanQueue = [];
+const SCAN_QUEUE_MAX = 32;
 let audioCtx = null;
 function getAudio() {
   if (audioCtx) return audioCtx;
@@ -915,11 +917,15 @@ function wireScanning() {
     if (el) { el.value = ''; el.focus(); }
   };
 
-  const process = async (raw) => {
-    const code = raw.trim();
-    if (!code) return;
-    if (scanBusy) return;
-    scanBusy = true;
+  const updateQueuePill = () => {
+    const pill = document.getElementById('scanQueuePill');
+    if (!pill) return;
+    if (scanQueue.length === 0) { pill.style.display = 'none'; return; }
+    pill.style.display = '';
+    pill.textContent = `+${scanQueue.length} en cola`;
+  };
+
+  const processOne = async (code) => {
     const mode = input.dataset.mode;
     const endpoint = mode === 'enviar' ? '/api/ops/paquetes/scan-send' : '/api/ops/paquetes/scan-receive';
     try {
@@ -948,10 +954,37 @@ function wireScanning() {
       updateScanLast(false, code, error.message || 'Error de red');
       const fb = document.getElementById('scanFeedback');
       if (fb) { fb.textContent = `✗ ${error.message}`; fb.className = 'hint error'; }
+    }
+  };
+
+  // Cola FIFO acotada — los escaneos rápidos no se pierden, se procesan en orden.
+  // Si se desborda (>SCAN_QUEUE_MAX), avisamos al operador con beep de error.
+  const drain = async () => {
+    if (scanBusy) return;
+    scanBusy = true;
+    try {
+      while (scanQueue.length > 0) {
+        const next = scanQueue.shift();
+        updateQueuePill();
+        await processOne(next);
+      }
     } finally {
       scanBusy = false;
       refocus();
     }
+  };
+
+  const process = (raw) => {
+    const code = raw.trim();
+    if (!code) return;
+    if (scanQueue.length >= SCAN_QUEUE_MAX) {
+      beep(false); flashScan(false);
+      updateScanLast(false, code, 'Cola llena — espera a que termine');
+      return;
+    }
+    scanQueue.push(code);
+    updateQueuePill();
+    if (!scanBusy) drain();
   };
 
   // Captura por teclado: las pistolas envían texto rápido + Enter.
@@ -1562,6 +1595,20 @@ function wireLoginForm() {
 }
 
 // ─── INICIO ───────────────────────────────────────────────────────────────────
+
+// Validación temprana: si JsBarcode no se cargó, las etiquetas adhesivas HTML
+// caen al fallback de texto que NO es escaneable. El operador debe saberlo.
+if (typeof window !== 'undefined' && !window.JsBarcode) {
+  console.error('[Astrapu] JsBarcode no disponible. Las etiquetas HTML imprimirán código en texto plano (no escaneable). Verifica que /jsbarcode.code128.min.js se sirva correctamente.');
+  setTimeout(() => {
+    const alert = document.getElementById('globalAlert');
+    if (alert) {
+      alert.textContent = '⚠️ Librería de códigos de barras no cargada — las etiquetas HTML no serán escaneables. Recarga la página o contacta al administrador.';
+      alert.className = 'alert error';
+      alert.style.display = '';
+    }
+  }, 1200);
+}
 
 wireLoginForm();
 

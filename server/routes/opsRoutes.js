@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import crypto from 'node:crypto';
 import { all, get, run, withTransaction } from '../db/connection.js';
-import { requireAuth, forbidReadOnlyMutations } from '../middleware/auth.js';
+import { requireAuth, requireRole, forbidReadOnlyMutations } from '../middleware/auth.js';
 import { writeAudit } from '../lib/audit.js';
 import { withIdempotency } from '../lib/idempotency.js';
 import { validateBody } from '../middleware/validation.js';
@@ -75,11 +75,19 @@ opsRoutes.post('/envios', opsMutationLimiter, forbidReadOnlyMutations, validateB
   res.json({ ok: true, data: result });
 });
 
-async function transitionByScan({ req, code, expectedState, newState, detail, auditAction, timestampField }) {
+async function transitionByScan({ req, code, expectedState, newState, detail, auditAction, timestampField, branchField }) {
   return withTransaction(async () => {
     const paquete = await get('SELECT * FROM paquetes WHERE guia = ? OR codigo_barras = ?', [code, code]);
     if (!paquete) return { ok: false, error: 'Paquete no encontrado' };
     if (paquete.estado !== expectedState) return { ok: false, error: `Estado inválido: ${paquete.estado}` };
+
+    // Branch ownership: admin opera cualquier sucursal, los operadores solo su sucursal asignada.
+    if (branchField && req.user.rol !== 'admin') {
+      const requiredBranch = paquete[branchField];
+      if (requiredBranch && req.user.sucursal_id !== requiredBranch) {
+        return { ok: false, error: 'Paquete no pertenece a tu sucursal' };
+      }
+    }
 
     const now = new Date().toISOString();
     const updated = await run(
@@ -100,9 +108,10 @@ async function transitionByScan({ req, code, expectedState, newState, detail, au
   });
 }
 
-opsRoutes.post('/paquetes/scan-send', opsScanLimiter, forbidReadOnlyMutations, validateBody(scanSchema), async (req, res) => {
+// Salida del paquete: solo `envios` (operador de despacho) o `admin`. Debe operar en sucursal_origen.
+opsRoutes.post('/paquetes/scan-send', opsScanLimiter, forbidReadOnlyMutations, requireRole('admin', 'envios'), validateBody(scanSchema), async (req, res) => {
   const { code } = req.body;
-  const result = await withIdempotency({ scope: 'scan_send', key: req.headers['x-idempotency-key'], refId: code, work: () => transitionByScan({ req, code, expectedState: 'PENDIENTE', newState: 'EN_TRANSITO', detail: 'Salida escaneada', auditAction: 'cambio_en_transito', timestampField: 'enviado_at' }) });
+  const result = await withIdempotency({ scope: 'scan_send', key: req.headers['x-idempotency-key'], refId: code, work: () => transitionByScan({ req, code, expectedState: 'PENDIENTE', newState: 'EN_TRANSITO', detail: 'Salida escaneada', auditAction: 'cambio_en_transito', timestampField: 'enviado_at', branchField: 'sucursal_origen' }) });
   if (result?.ok && result?.data) {
     const p = result.data;
     registerSampleStart(p.id, p.sucursal_origen, p.sucursal_destino).catch(() => {});
@@ -110,9 +119,10 @@ opsRoutes.post('/paquetes/scan-send', opsScanLimiter, forbidReadOnlyMutations, v
   return sendResult(res, result, 'SCAN_REJECTED');
 });
 
-opsRoutes.post('/paquetes/scan-receive', opsScanLimiter, forbidReadOnlyMutations, validateBody(scanSchema), async (req, res) => {
+// Recepción: solo `entrega` (operador de la sucursal destino) o `admin`. Debe operar en sucursal_destino.
+opsRoutes.post('/paquetes/scan-receive', opsScanLimiter, forbidReadOnlyMutations, requireRole('admin', 'entrega'), validateBody(scanSchema), async (req, res) => {
   const { code } = req.body;
-  const result = await withIdempotency({ scope: 'scan_receive', key: req.headers['x-idempotency-key'], refId: code, work: () => transitionByScan({ req, code, expectedState: 'EN_TRANSITO', newState: 'DISPONIBLE', detail: 'Recepción escaneada', auditAction: 'recepcion_paquete', timestampField: 'recibido_at' }) });
+  const result = await withIdempotency({ scope: 'scan_receive', key: req.headers['x-idempotency-key'], refId: code, work: () => transitionByScan({ req, code, expectedState: 'EN_TRANSITO', newState: 'DISPONIBLE', detail: 'Recepción escaneada', auditAction: 'recepcion_paquete', timestampField: 'recibido_at', branchField: 'sucursal_destino' }) });
   if (result?.ok && result?.data) {
     registerSampleEnd(result.data.id).catch(() => {});
   }
