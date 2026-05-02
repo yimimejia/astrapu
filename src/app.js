@@ -1055,38 +1055,46 @@ function wireBusqueda() {
   const inputPhone = document.getElementById('buscarTelefono');
   const inputCode  = document.getElementById('buscarCodigo');
   const codeFb     = document.getElementById('buscarCodigoFeedback');
+  const infoCard   = document.getElementById('paqueteInfoCard');
   const result     = document.getElementById('resultadoBusqueda');
   if (!result) return;
 
-  const goToDeliver = (paqueteId) => {
-    selectedDeliveryPackage = paqueteId;
-    currentView = 'entregar_paquete';
-    logAudit({ modulo: 'entrega', accion: 'busqueda_sensible', entidad: 'paquetes', entidad_id: paqueteId });
-    render();
+  const stateLabel = (estado) => estado === 'EN_TRANSITO' ? 'En camino'
+    : estado === 'PENDIENTE' ? 'Aún no ha salido'
+    : estado === 'ENTREGADO' ? 'Ya entregado'
+    : estado === 'DISPONIBLE' ? 'Disponible para retiro'
+    : estado;
+
+  const renderInfoCard = (p) => {
+    if (!infoCard) return;
+    const client = db.clientes.find((c) => c.id === p.cliente_id);
+    const sucO = db.sucursales.find((s) => s.id === p.sucursal_origen)?.nombre || '-';
+    const sucD = db.sucursales.find((s) => s.id === p.sucursal_destino)?.nombre || '-';
+    infoCard.innerHTML = `
+      <article class="result-card" style="text-align:left;margin-top:.8rem">
+        <h4>${p.guia}</h4>
+        <p><b>Cliente:</b> ${p.cliente_nombre || client?.nombre || '-'}</p>
+        <p><b>Cédula:</b> ${p.cedula || client?.cedula || '-'}</p>
+        <p><b>Teléfono:</b> ${p.telefono_destinatario}</p>
+        <p><b>Descripción:</b> ${p.descripcion || '-'}</p>
+        <p><b>Origen → Destino:</b> ${sucO} → ${sucD}</p>
+        <p><b>Monto:</b> RD$ ${Number(p.monto || 0).toFixed(2)}</p>
+        <span class="badge ${(p.estado || '').toLowerCase()}">${stateLabel(p.estado)}</span>
+      </article>`;
   };
 
   const renderCards = (rows) => {
     result.innerHTML = rows.map((p) => {
       const client = db.clientes.find((c) => c.id === p.cliente_id);
-      const action = p.estado === 'DISPONIBLE'
-        ? `<button class="btn primary" data-select-delivery="${p.id}">Ir a entregar</button>`
-        : `<span class="badge ${p.estado.toLowerCase()}">${p.estado === 'EN_TRANSITO' ? 'En camino' : p.estado === 'PENDIENTE' ? 'Aún no ha salido' : p.estado === 'ENTREGADO' ? 'Ya entregado' : p.estado}</span>`;
-
       return `<article class="result-card">
         <h4>${p.guia}</h4>
         <p><b>Nombre:</b> ${p.cliente_nombre || client?.nombre || '-'}</p>
         <p><b>Teléfono:</b> ${p.telefono_destinatario}</p>
         <p><b>Origen:</b> ${db.sucursales.find((s) => s.id === p.sucursal_origen)?.nombre || '-'}</p>
         <p><b>Destino:</b> ${db.sucursales.find((s) => s.id === p.sucursal_destino)?.nombre || '-'}</p>
-        <p><b>Estado:</b> ${p.estado}</p>
-        <p><b>Registro:</b> ${(p.created_at || '').slice(0, 16).replace('T', ' ')}</p>
-        ${action}
+        <span class="badge ${(p.estado || '').toLowerCase()}">${stateLabel(p.estado)}</span>
       </article>`;
-    }).join('') || '<p class="hint">Sin resultados.</p>';
-
-    result.querySelectorAll('[data-select-delivery]').forEach((btn) =>
-      btn.addEventListener('click', () => goToDeliver(btn.dataset.selectDelivery)),
-    );
+    }).join('') || '';
   };
 
   const searchByPhone = async () => {
@@ -1099,8 +1107,7 @@ function wireBusqueda() {
     }
   };
 
-  // Búsqueda por código/guía (pistola). Si encuentra UN paquete DISPONIBLE,
-  // navega automáticamente a "Entregar paquete" y enfoca la cédula.
+  // Búsqueda por código/guía: solo muestra información (no navega a entrega).
   const searchByCode = async (raw) => {
     const code = (raw || '').trim();
     if (!code) return;
@@ -1108,29 +1115,17 @@ function wireBusqueda() {
       const rows = await api(`/api/ops/paquetes/search?code=${encodeURIComponent(code)}`).then((r) => r.data || []);
       if (rows.length === 0) {
         if (codeFb) { codeFb.textContent = `✗ No existe paquete con código ${code}`; codeFb.className = 'hint error'; }
-        renderCards([]);
+        if (infoCard) infoCard.innerHTML = '';
         return;
       }
-      const p = rows[0];
-      if (p.estado === 'DISPONIBLE') {
-        if (codeFb) { codeFb.textContent = `✓ ${p.guia} disponible — abriendo entrega…`; codeFb.className = 'hint success'; }
-        goToDeliver(p.id);
-        return;
-      }
-      // Existe pero no está disponible: mostrar el motivo claro
-      const motivo = p.estado === 'PENDIENTE' ? 'aún no ha salido de origen'
-                  : p.estado === 'EN_TRANSITO' ? 'aún en tránsito, no ha llegado a destino'
-                  : p.estado === 'ENTREGADO' ? 'ya fue entregado'
-                  : `estado: ${p.estado}`;
-      if (codeFb) { codeFb.textContent = `⚠ ${p.guia} — ${motivo}`; codeFb.className = 'hint error'; }
-      renderCards(rows);
+      if (codeFb) { codeFb.textContent = `✓ Información del paquete:`; codeFb.className = 'hint success'; }
+      renderInfoCard(rows[0]);
     } catch (error) {
       if (codeFb) { codeFb.textContent = `✗ ${error.message}`; codeFb.className = 'hint error'; }
     }
   };
 
   if (inputCode) {
-    // Pistola: dispara texto + Enter — procesamos al instante con Enter.
     inputCode.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         e.preventDefault();
@@ -1138,7 +1133,6 @@ function wireBusqueda() {
         inputCode.value = '';
       }
     });
-    // Fallback si la pistola no envía Enter
     inputCode.addEventListener('input', () => {
       clearTimeout(scanTimer);
       scanTimer = setTimeout(() => {
@@ -1159,61 +1153,168 @@ function wireBusqueda() {
 // ─── ENTREGA ──────────────────────────────────────────────────────────────────
 
 function wireEntrega() {
-  const preview = document.getElementById('entregaSeleccion');
   const cedula = document.getElementById('cedulaEntrega');
-  const btn = document.getElementById('confirmarEntregaBtn');
-  const feedback = document.getElementById('entregaFeedback');
-  if (!btn) return;
+  const cedulaFb = document.getElementById('cedulaFeedback');
+  const paso1 = document.getElementById('entregaPaso1');
+  const paso2 = document.getElementById('entregaPaso2');
+  const paquetesBox = document.getElementById('paquetesDeCedula');
+  const scanFinal = document.getElementById('scanFinalEntrega');
+  const scanFb = document.getElementById('scanFinalFeedback');
+  const cancelBtn = document.getElementById('cancelarEntregaBtn');
+  const modal = document.getElementById('entregaModal');
+  const modalDetail = document.getElementById('entregaModalDetail');
+  const stepsEl = document.getElementById('entregaSteps');
+  if (!cedula) return;
 
+  let cedulaActual = '';
+  let paquetesDisponibles = [];
+  let confirmando = false;
+
+  const setStep = (n) => {
+    if (!stepsEl) return;
+    stepsEl.querySelectorAll('span').forEach((sp) => {
+      sp.classList.toggle('active', Number(sp.dataset.step) === n);
+    });
+  };
+
+  const goPaso1 = () => {
+    cedulaActual = '';
+    paquetesDisponibles = [];
+    if (paso1) paso1.style.display = '';
+    if (paso2) paso2.style.display = 'none';
+    if (cedula) { cedula.value = ''; setTimeout(() => cedula.focus(), 50); }
+    if (cedulaFb) { cedulaFb.textContent = ''; cedulaFb.className = 'hint'; }
+    setStep(1);
+  };
+
+  const goPaso2 = (rows) => {
+    paquetesDisponibles = rows;
+    if (paso1) paso1.style.display = 'none';
+    if (paso2) paso2.style.display = '';
+    if (paquetesBox) {
+      paquetesBox.innerHTML = rows.map((p) => `
+        <article class="result-card">
+          <h4>${p.guia}</h4>
+          <p><b>Cliente:</b> ${p.cliente_nombre || '-'}</p>
+          <p><b>Descripción:</b> ${p.descripcion || '-'}</p>
+          <p><b>Destino:</b> ${db.sucursales.find((s) => s.id === p.sucursal_destino)?.nombre || '-'}</p>
+          <span class="badge disponible">Disponible</span>
+        </article>`).join('');
+    }
+    if (scanFinal) { scanFinal.value = ''; setTimeout(() => scanFinal.focus(), 50); }
+    if (scanFb) { scanFb.textContent = ''; scanFb.className = 'hint'; }
+    setStep(2);
+  };
+
+  const buscarPorCedula = async () => {
+    const v = (cedula.value || '').trim();
+    if (v.length < 5) {
+      if (cedulaFb) { cedulaFb.textContent = 'Cédula incompleta.'; cedulaFb.className = 'hint error'; }
+      return;
+    }
+    try {
+      const rows = await api(`/api/ops/paquetes/search?cedula=${encodeURIComponent(v)}&only_available=1`).then((r) => r.data || []);
+      if (rows.length === 0) {
+        if (cedulaFb) { cedulaFb.textContent = `✗ No hay paquetes disponibles para la cédula ${v}`; cedulaFb.className = 'hint error'; }
+        return;
+      }
+      cedulaActual = v;
+      goPaso2(rows);
+    } catch (error) {
+      if (cedulaFb) { cedulaFb.textContent = error.message; cedulaFb.className = 'hint error'; }
+    }
+  };
+
+  const mostrarModal = (guia) => {
+    if (!modal) return;
+    if (modalDetail) modalDetail.textContent = `Guía ${guia} entregada correctamente.`;
+    modal.style.display = '';
+    setStep(3);
+    setTimeout(() => {
+      if (modal) modal.style.display = 'none';
+      goPaso1();
+      render(); // refresca lista de "Buscar paquete" en el sidebar
+    }, 5000);
+  };
+
+  const confirmarConEscaneo = async (raw) => {
+    if (confirmando) return;
+    const code = (raw || '').trim();
+    if (!code) return;
+    // Buscar el paquete escaneado dentro de los disponibles para esta cédula
+    const match = paquetesDisponibles.find((p) => p.guia === code || p.codigo_barras === code);
+    if (!match) {
+      beep(false); flashScan(false);
+      if (scanFb) { scanFb.textContent = `✗ El código ${code} no corresponde a un paquete de esta cédula`; scanFb.className = 'hint error'; }
+      if (scanFinal) scanFinal.value = '';
+      return;
+    }
+    confirmando = true;
+    try {
+      const sessionRes = await api('/api/ops/paquetes/delivery/session', {
+        method: 'POST',
+        body: { paquete_id: match.id, cedula: cedulaActual },
+      });
+      const finalRes = await api('/api/ops/paquetes/delivery/confirm', {
+        method: 'POST',
+        body: { session_id: sessionRes.data.session_id, scanned_code: code },
+      });
+      if (finalRes.ok) {
+        beep(true); flashScan(true);
+        await syncDataFromBackend();
+        mostrarModal(match.guia);
+      } else {
+        beep(false); flashScan(false);
+        if (scanFb) { scanFb.textContent = `✗ ${finalRes.error}`; scanFb.className = 'hint error'; }
+      }
+    } catch (error) {
+      beep(false); flashScan(false);
+      if (scanFb) { scanFb.textContent = `✗ ${error.message}`; scanFb.className = 'hint error'; }
+    } finally {
+      confirmando = false;
+    }
+  };
+
+  cedula.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); buscarPorCedula(); }
+  });
+  cedula.addEventListener('blur', () => {
+    if (cedula.value.trim().length >= 5 && !cedulaActual) buscarPorCedula();
+  });
+
+  if (scanFinal) {
+    scanFinal.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        confirmarConEscaneo(scanFinal.value);
+        scanFinal.value = '';
+      }
+    });
+    scanFinal.addEventListener('input', () => {
+      clearTimeout(scanTimer);
+      scanTimer = setTimeout(() => {
+        if (scanFinal.value.trim().length > 4) {
+          confirmarConEscaneo(scanFinal.value);
+          scanFinal.value = '';
+        }
+      }, 300);
+    });
+  }
+
+  cancelBtn?.addEventListener('click', goPaso1);
+
+  // Si llegan desde el menú con un paquete pre-seleccionado, autocompletar la cédula
   if (selectedDeliveryPackage) {
     const p = db.paquetes.find((x) => x.id === selectedDeliveryPackage);
     const c = db.clientes.find((x) => x.id === p?.cliente_id);
-    if (preview && p) {
-      preview.innerHTML = `<b>Paquete seleccionado:</b> ${p.guia} | ${p.cliente_nombre || c?.nombre || '-'} | Estado: ${p.estado}`;
+    if (c?.cedula && cedula) {
+      cedula.value = c.cedula;
+      buscarPorCedula();
     }
-    // Auto-focus en cédula para que el operador escriba sin tocar el mouse
-    if (cedula) setTimeout(() => cedula.focus(), 100);
+    selectedDeliveryPackage = null;
+  } else {
+    setTimeout(() => cedula.focus(), 100);
   }
-
-  // Enter en cédula confirma directamente (un solo paso de validación humana)
-  if (cedula) {
-    cedula.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') { e.preventDefault(); btn?.click(); }
-    });
-  }
-
-  btn.addEventListener('click', () => {
-    if (!selectedDeliveryPackage) {
-      if (feedback) feedback.textContent = 'Debe seleccionar un paquete desde Buscar paquete.';
-      return;
-    }
-    const paquete = db.paquetes.find((x) => x.id === selectedDeliveryPackage);
-    // El "escaneo final" ya ocurrió en Buscar paquete — reusamos la guía del paquete
-    // para satisfacer la validación del backend sin pedir otro escaneo al operador.
-    const codigoFinal = paquete?.codigo_barras || paquete?.guia || '';
-    api('/api/ops/paquetes/delivery/session', {
-      method: 'POST',
-      body: { paquete_id: selectedDeliveryPackage, cedula: cedula.value },
-    }).then((sessionRes) => {
-      selectedDeliverySession = sessionRes.data.session_id;
-      return api('/api/ops/paquetes/delivery/confirm', {
-        method: 'POST',
-        body: { session_id: selectedDeliverySession, scanned_code: codigoFinal },
-      });
-    }).then(async (finalRes) => {
-      if (feedback) {
-        feedback.textContent = finalRes.ok ? '✓ Entrega confirmada exitosamente' : finalRes.error;
-        feedback.className = `hint ${finalRes.ok ? 'success' : 'error'}`;
-      }
-      if (finalRes.ok) {
-        selectedDeliveryPackage = null;
-        selectedDeliverySession = null;
-      }
-      await render();
-    }).catch((error) => {
-      if (feedback) { feedback.textContent = error.message; feedback.className = 'hint error'; }
-    });
-  });
 }
 
 // ─── CIERRE ───────────────────────────────────────────────────────────────────

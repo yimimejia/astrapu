@@ -651,6 +651,66 @@ tr:last-child td { border-bottom: none; }
   border-radius: 999px;
 }
 
+/* Delivery success modal — full-screen overlay shown for 5s after confirm */
+.entrega-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.55);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: entregaModalIn .25s ease-out;
+}
+.entrega-modal-content {
+  background: #fff;
+  border-radius: var(--radius-lg);
+  padding: 2.5rem 2rem;
+  text-align: center;
+  max-width: 420px;
+  width: 90%;
+  box-shadow: 0 20px 60px rgba(0,0,0,.3);
+  border-top: 6px solid #22c55e;
+}
+.entrega-modal-icon {
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  background: #22c55e;
+  color: #fff;
+  font-size: 3.5rem;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 1rem;
+  animation: entregaIconPop .35s cubic-bezier(.34,1.56,.64,1);
+}
+.entrega-modal-content h2 {
+  color: #15803d;
+  font-size: 1.6rem;
+  margin: .5rem 0 .4rem;
+}
+.entrega-modal-content p {
+  color: var(--gray-700);
+  font-size: 1rem;
+  margin: 0;
+}
+@keyframes entregaModalIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes entregaIconPop {
+  0%   { transform: scale(0); }
+  60%  { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+.entrega-paso { animation: fadeIn .2s ease-out; }
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 /* Last scan card — large readout for outdoor visibility */
 .scan-last {
   margin-top: .7rem;

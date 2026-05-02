@@ -956,18 +956,37 @@ function panelEscaneo(mode) {
 // ─── BUSCAR PAQUETE ───────────────────────────────────────────────────────────
 
 function panelBuscar() {
+  const disponibles = db.paquetes.filter((p) => p.estado === 'DISPONIBLE');
+  const cards = disponibles.map((p) => {
+    const sucDestino = db.sucursales.find((s) => s.id === p.sucursal_destino)?.nombre || '-';
+    return `<article class="result-card">
+      <h4>${p.guia}</h4>
+      <p><b>Cliente:</b> ${p.cliente_nombre || clienteNombre(p.cliente_id)}</p>
+      <p><b>Teléfono:</b> ${p.telefono_destinatario}</p>
+      <p><b>Destino:</b> ${sucDestino}</p>
+      <p><b>Recibido:</b> ${(p.recibido_at || '').slice(0, 16).replace('T', ' ')}</p>
+      <span class="badge disponible">Disponible para retiro</span>
+    </article>`;
+  }).join('') || '<p class="hint">No hay paquetes disponibles para retiro en este momento.</p>';
+
   return `<section class="panel">
-    <header class="panel-header"><h3>Buscar paquete</h3></header>
+    <header class="panel-header">
+      <h3>Buscar paquete</h3>
+      <span class="scan-counter-pill">${disponibles.length} disponible${disponibles.length === 1 ? '' : 's'}</span>
+    </header>
     <div class="scan-zone scan-zone-big" style="margin-bottom:1rem">
-      <div class="scan-icon">📡</div>
-      <h2>Escanear código de barras o guía</h2>
-      <p class="scan-help">Apunte la pistola y dispare. Si el paquete está disponible, irá automáticamente a <b>Entregar paquete</b>.</p>
+      <div class="scan-icon">🔎</div>
+      <h2>Consultar paquete</h2>
+      <p class="scan-help">Escanee la pistola o teclee el código para ver la información. <b>Esta vista es de solo consulta.</b></p>
       <input id="buscarCodigo" placeholder="GUIA-000000001 o ASTRAPU-000000001" autofocus />
       <div id="buscarCodigoFeedback" class="hint"></div>
+      <div id="paqueteInfoCard"></div>
     </div>
     <div class="filters-bar">
       <input id="buscarTelefono" placeholder="O buscar por teléfono del destinatario (ej: 8095550000)" />
     </div>
+    <h4 style="margin:1rem 0 .6rem">Paquetes disponibles para retiro</h4>
+    <div class="result-cards">${cards}</div>
     <div id="resultadoBusqueda" class="result-cards"></div>
   </section>`;
 }
@@ -977,15 +996,41 @@ function panelBuscar() {
 function panelEntregar() {
   return `<section class="panel">
     <header class="panel-header"><h3>Entregar paquete</h3></header>
-    <div class="steps">
-      <span class="active">1 Buscar</span>
-      <span>2 Cédula</span>
-      <span>3 Confirmar</span>
+    <div class="steps" id="entregaSteps">
+      <span class="active" data-step="1">1 Cédula</span>
+      <span data-step="2">2 Escanear paquete</span>
+      <span data-step="3">3 Entrega realizada</span>
     </div>
-    <div id="entregaSeleccion" class="preview">Seleccione un paquete desde <b>Buscar paquete</b>.</div>
-    <label>Cédula del destinatario<input id="cedulaEntrega" placeholder="001-0000000-0" /></label>
-    <button class="btn primary" id="confirmarEntregaBtn">Confirmar entrega</button>
-    <div id="entregaFeedback" class="hint"></div>
+
+    <div id="entregaPaso1" class="entrega-paso">
+      <div class="scan-zone scan-zone-big">
+        <div class="scan-icon">🪪</div>
+        <h2>Cédula de quien recibe o quien envía</h2>
+        <p class="scan-help">Ingrese la cédula. Aparecerán los paquetes disponibles para esa persona.</p>
+        <input id="cedulaEntrega" placeholder="001-0000000-0" autofocus />
+        <div id="cedulaFeedback" class="hint"></div>
+      </div>
+    </div>
+
+    <div id="entregaPaso2" class="entrega-paso" style="display:none">
+      <div id="paquetesDeCedula" class="result-cards"></div>
+      <div class="scan-zone scan-zone-big">
+        <div class="scan-icon">📡</div>
+        <h2>Escanear el paquete</h2>
+        <p class="scan-help">Apunte la pistola al código y dispare para confirmar la entrega.</p>
+        <input id="scanFinalEntrega" placeholder="Esperando escaneo…" />
+        <div id="scanFinalFeedback" class="hint"></div>
+        <button class="btn ghost" id="cancelarEntregaBtn" type="button" style="margin-top:.5rem">← Cambiar cédula</button>
+      </div>
+    </div>
+
+    <div id="entregaModal" class="entrega-modal" style="display:none">
+      <div class="entrega-modal-content">
+        <div class="entrega-modal-icon">✓</div>
+        <h2>Entrega realizada</h2>
+        <p id="entregaModalDetail">—</p>
+      </div>
+    </div>
   </section>`;
 }
 
