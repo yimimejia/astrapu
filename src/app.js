@@ -991,6 +991,10 @@ function wireScanning() {
         refreshTable();
         const fb = document.getElementById('scanFeedback');
         if (fb) { fb.textContent = `✓ ${detail} — ${guia}`; fb.className = 'hint success'; }
+        // Re-render para que las listas (Pendientes, Despachados, KPIs) se
+        // actualicen en tiempo real sin que el operador tenga que recargar.
+        // wireScanning() se llama de nuevo y refocus() pone el cursor en el input.
+        await render();
       } else {
         beep(false); flashScan(false);
         updateScanLast(false, code, result.error || 'Error');
