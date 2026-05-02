@@ -976,16 +976,14 @@ function panelBuscar() {
 
 function panelEntregar() {
   return `<section class="panel">
-    <header class="panel-header"><h3>Entrega con doble validación</h3></header>
+    <header class="panel-header"><h3>Entregar paquete</h3></header>
     <div class="steps">
       <span class="active">1 Buscar</span>
       <span>2 Cédula</span>
-      <span>3 Escaneo final</span>
-      <span>4 Confirmar</span>
+      <span>3 Confirmar</span>
     </div>
     <div id="entregaSeleccion" class="preview">Seleccione un paquete desde <b>Buscar paquete</b>.</div>
     <label>Cédula del destinatario<input id="cedulaEntrega" placeholder="001-0000000-0" /></label>
-    <label>Escaneo final (guía o código de barras)<input id="scanEntrega" placeholder="Escanee la etiqueta" /></label>
     <button class="btn primary" id="confirmarEntregaBtn">Confirmar entrega</button>
     <div id="entregaFeedback" class="hint"></div>
   </section>`;

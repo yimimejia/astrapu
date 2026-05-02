@@ -1161,7 +1161,6 @@ function wireBusqueda() {
 function wireEntrega() {
   const preview = document.getElementById('entregaSeleccion');
   const cedula = document.getElementById('cedulaEntrega');
-  const scan = document.getElementById('scanEntrega');
   const btn = document.getElementById('confirmarEntregaBtn');
   const feedback = document.getElementById('entregaFeedback');
   if (!btn) return;
@@ -1176,13 +1175,9 @@ function wireEntrega() {
     if (cedula) setTimeout(() => cedula.focus(), 100);
   }
 
-  // Saltar de cédula a escaneo final con Enter
-  if (cedula && scan) {
+  // Enter en cédula confirma directamente (un solo paso de validación humana)
+  if (cedula) {
     cedula.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') { e.preventDefault(); scan.focus(); }
-    });
-    // Pistola sobre el campo de escaneo dispara confirmación con Enter
-    scan.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') { e.preventDefault(); btn?.click(); }
     });
   }
@@ -1192,6 +1187,10 @@ function wireEntrega() {
       if (feedback) feedback.textContent = 'Debe seleccionar un paquete desde Buscar paquete.';
       return;
     }
+    const paquete = db.paquetes.find((x) => x.id === selectedDeliveryPackage);
+    // El "escaneo final" ya ocurrió en Buscar paquete — reusamos la guía del paquete
+    // para satisfacer la validación del backend sin pedir otro escaneo al operador.
+    const codigoFinal = paquete?.codigo_barras || paquete?.guia || '';
     api('/api/ops/paquetes/delivery/session', {
       method: 'POST',
       body: { paquete_id: selectedDeliveryPackage, cedula: cedula.value },
@@ -1199,7 +1198,7 @@ function wireEntrega() {
       selectedDeliverySession = sessionRes.data.session_id;
       return api('/api/ops/paquetes/delivery/confirm', {
         method: 'POST',
-        body: { session_id: selectedDeliverySession, scanned_code: scan.value.trim() },
+        body: { session_id: selectedDeliverySession, scanned_code: codigoFinal },
       });
     }).then(async (finalRes) => {
       if (feedback) {
