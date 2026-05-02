@@ -1,6 +1,6 @@
 import { MENUS, VIEW_LABELS } from './constants.js';
 import { db } from './data/store.js';
-import { loginAs, getCurrentUser, getRoleMenu, canEdit } from './services/authService.js';
+import { loginAs, logout, getCurrentUser, getRoleMenu, canEdit, getStoredUser, isLoggedIn } from './services/authService.js';
 import { logAudit } from './services/auditService.js';
 import { connectQZ, disconnectQZ, getPrinters, setPrinterConfig, getPrinterConfig, printThermalTicket, printAdhesiveLabel } from './services/qzService.js';
 import { printSaleDocuments } from './services/printService.js';
@@ -8,7 +8,6 @@ import { renderView, menuButton, viewState } from './views.js';
 import { api } from './services/apiClient.js';
 
 const refs = {
-  role: document.getElementById('roleSwitcher'),
   title: document.getElementById('viewTitle'),
   subtitle: document.getElementById('viewSubtitle'),
   menu: document.getElementById('sideMenu'),
@@ -26,7 +25,7 @@ const defaultViewByRole = {
   contable: 'dashboard_contable',
 };
 
-let currentView = defaultViewByRole[getCurrentUser().rol];
+let currentView = defaultViewByRole[getCurrentUser()?.rol] || 'dashboard';
 let scanTimer;
 let selectedDeliveryPackage = null;
 let selectedDeliverySession = null;
@@ -97,12 +96,22 @@ function renderMenu() {
 
 function renderSession() {
   const user = getCurrentUser();
+  if (!user) return;
   const branchName = db.sucursales.find((s) => s.id === user.sucursal_id)?.nombre || '-';
   refs.user.textContent = user.nombre;
   refs.roleLabel.textContent = user.rol.toUpperCase();
-  refs.role.value = user.rol;
   refs.branch.textContent = branchName;
   refs.subtitle.textContent = `${user.nombre} · ${user.rol.toUpperCase()} · ${branchName}`;
+
+  // Sidebar user card
+  const avatarEl = document.getElementById('sidebarAvatar');
+  const nameEl   = document.getElementById('sidebarUserName');
+  const roleEl   = document.getElementById('sidebarUserRole');
+  const branchEl = document.getElementById('sidebarUserBranch');
+  if (avatarEl) avatarEl.textContent = (user.nombre || user.username || '?')[0].toUpperCase();
+  if (nameEl)   nameEl.textContent   = user.nombre || user.username;
+  if (roleEl)   roleEl.textContent   = user.rol.toUpperCase();
+  if (branchEl) branchEl.textContent = branchName;
 }
 
 async function render() {
@@ -1135,26 +1144,12 @@ function wirePrinters() {
   populatePrinterSelectors();
 }
 
-// ─── SELECTOR DE ROL ──────────────────────────────────────────────────────────
+// ─── LOGOUT ───────────────────────────────────────────────────────────────────
 
-refs.role.addEventListener('change', async () => {
-  try {
-    viewState.paquetes = { search: '', estado: '', selectedId: null };
-    viewState.cuadres = { selectedId: null };
-    viewState.clientes = { search: '', showForm: false, editId: null };
-    viewState.sucursales = { showForm: false, editId: null };
-    viewState.usuarios = { showForm: false, editId: null };
-    viewState.auditoria = { page: 1, usuario: '', modulo: '', accion: '', date_from: '', date_to: '' };
-    selectedDeliveryPackage = null;
-    selectedDeliverySession = null;
-
-    await loginAs(refs.role.value);
-    currentView = defaultViewByRole[getCurrentUser().rol];
-    logAudit({ modulo: 'auth', accion: 'login', entidad: 'usuarios', entidad_id: getCurrentUser().id });
-    render();
-  } catch (error) {
-    showAlert(`Error de autenticación: ${error.message}`, 'error');
-  }
+document.getElementById('logoutBtn')?.addEventListener('click', () => {
+  logAudit({ modulo: 'auth', accion: 'logout', entidad: 'usuarios', entidad_id: getCurrentUser()?.id });
+  logout();
+  showLoginScreen();
 });
 
 // ─── HAMBURGER MENU (MÓVIL) ───────────────────────────────────────────────────
@@ -1376,13 +1371,81 @@ async function wireInteligencia() {
   });
 }());
 
+// ─── LOGIN SCREEN ─────────────────────────────────────────────────────────────
+
+function showLoginScreen() {
+  document.getElementById('loginScreen').style.display = '';
+  document.getElementById('appShell').style.display = 'none';
+  document.getElementById('loginUsername')?.focus();
+  document.getElementById('loginError').style.display = 'none';
+}
+
+function showAppShell() {
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('appShell').style.display = '';
+}
+
+function wireLoginForm() {
+  const form     = document.getElementById('loginForm');
+  const errDiv   = document.getElementById('loginError');
+  const submitBtn = document.getElementById('loginSubmit');
+  const btnText   = document.getElementById('loginBtnText');
+  const spinner   = document.getElementById('loginSpinner');
+
+  document.getElementById('togglePw')?.addEventListener('click', () => {
+    const pw = document.getElementById('loginPassword');
+    pw.type = pw.type === 'password' ? 'text' : 'password';
+  });
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const username = document.getElementById('loginUsername').value.trim();
+    const password = document.getElementById('loginPassword').value;
+
+    if (!username || !password) {
+      errDiv.textContent = 'Por favor ingresa usuario y contraseña.';
+      errDiv.style.display = '';
+      return;
+    }
+
+    errDiv.style.display = 'none';
+    submitBtn.disabled = true;
+    btnText.textContent = 'Verificando...';
+    spinner.style.display = '';
+
+    try {
+      await loginAs(username, password);
+      currentView = defaultViewByRole[getCurrentUser().rol];
+      logAudit({ modulo: 'auth', accion: 'login', entidad: 'usuarios', entidad_id: getCurrentUser().id });
+      showAppShell();
+      render();
+      setTimeout(tryAutoConnectQZ, 1500);
+    } catch (error) {
+      errDiv.textContent = error.message || 'Credenciales inválidas. Intenta de nuevo.';
+      errDiv.style.display = '';
+    } finally {
+      submitBtn.disabled = false;
+      btnText.textContent = 'Entrar';
+      spinner.style.display = 'none';
+    }
+  });
+}
+
 // ─── INICIO ───────────────────────────────────────────────────────────────────
 
-try {
-  await loginAs('admin');
-  logAudit({ modulo: 'auth', accion: 'login', entidad: 'usuarios', entidad_id: getCurrentUser().id });
-  render();
-  setTimeout(tryAutoConnectQZ, 1500);
-} catch (error) {
-  showAlert(`No se pudo conectar al backend: ${error.message}`, 'error');
+wireLoginForm();
+
+// Si hay sesión guardada válida, entrar directo al app
+const storedUser = getStoredUser();
+if (storedUser) {
+  currentView = defaultViewByRole[storedUser.rol];
+  showAppShell();
+  try {
+    render();
+    setTimeout(tryAutoConnectQZ, 1500);
+  } catch (error) {
+    showAlert(`Error al restaurar sesión: ${error.message}`, 'error');
+  }
+} else {
+  showLoginScreen();
 }

@@ -1,0 +1,1219 @@
+MANDATO — ASISTENTE DE CONFIGURACIÓN PARA FACTURACIÓN ELECTRÓNICA DGII
+
+Actúa como arquitecto senior full-stack especialista en facturación electrónica dominicana DGII, e-CF, e-NCF, certificado digital, XML firmado, Representación Impresa, contingencia fiscal, NCF, POS, sistemas administrativos y cumplimiento tributario.
+
+Necesito implementar un ASISTENTE DE CONFIGURACIÓN DE FACTURACIÓN ELECTRÓNICA DGII que pueda ser utilizado en cualquier sistema.
+
+NO amarres este módulo a una empresa específica.
+NO escribas nombres de empresas quemados.
+NO escribas nombres de aplicaciones quemados.
+NO dependas de un solo tipo de negocio.
+NO hagas una pantalla simple con campos sueltos.
+NO hagas simulaciones falsas.
+NO digas que DGII aceptó algo si no hubo respuesta real de DGII.
+NO permitas activar producción si faltan requisitos.
+NO permitas emitir e-CF si el asistente no está completado correctamente.
+NO permitas duplicar e-NCF.
+NO permitas editar XML firmado.
+NO permitas borrar e-CF emitidos.
+NO permitas mezclar configuración fiscal entre sucursales, empresas o entidades.
+
+OBJETIVO GENERAL
+
+Crear un asistente paso a paso que guíe al usuario para configurar la facturación electrónica DGII dentro del sistema.
+
+El asistente debe permitir:
+
+1. Registrar los datos fiscales del contribuyente.
+2. Validar requisitos básicos para ser emisor electrónico.
+3. Cargar y proteger el certificado digital.
+4. Registrar la solicitud de emisor electrónico.
+5. Configurar ambiente de pruebas.
+6. Gestionar sets de pruebas.
+7. Generar y validar Representación Impresa.
+8. Registrar Declaración Jurada.
+9. Registrar Certificación DGII.
+10. Configurar rangos e-NCF.
+11. Configurar ambiente de producción.
+12. Activar o bloquear emisión electrónica según el estado real.
+13. Emitir e-CF desde ventas, facturas o documentos del sistema.
+14. Firmar XML digitalmente.
+15. Enviar e-CF a DGII.
+16. Consultar estado.
+17. Manejar respuestas, rechazos y errores.
+18. Manejar contingencia offline.
+19. Reintentar envíos pendientes.
+20. Recibir e-CF de proveedores.
+21. Guardar auditoría fiscal completa.
+
+PRINCIPIO DE DISEÑO
+
+Este asistente debe ser reutilizable.
+
+Debe funcionar para:
+- Cualquier empresa.
+- Cualquier sistema POS.
+- Cualquier sistema administrativo.
+- Cualquier sistema de facturación.
+- Cualquier negocio con ventas.
+- Cualquier negocio con servicios.
+- Sistemas con una sola empresa.
+- Sistemas multiempresa.
+- Sistemas multisucursal.
+
+No debe contener textos quemados como:
+- Nombre de empresa específica.
+- Nombre de aplicación específica.
+- RNC específico.
+- Logo específico.
+- Endpoints quemados sin configuración.
+- Certificado fijo.
+- Secuencias e-NCF fijas.
+
+Todo debe venir desde configuración.
+
+RUTA SUGERIDA DEL MÓDULO
+
+Frontend:
+
+/fiscal/asistente-dgii
+/fiscal/facturacion-electronica
+/fiscal/ecf-configuracion
+/fiscal/ecf-rangos
+/fiscal/ecf-documentos
+/fiscal/ecf-contingencia
+/fiscal/ecf-recibidos
+/fiscal/ecf-auditoria
+
+Backend:
+
+/server/modules/fiscal/ecf
+/server/modules/fiscal/ecf/assistant
+/server/modules/fiscal/ecf/settings
+/server/modules/fiscal/ecf/certificates
+/server/modules/fiscal/ecf/ranges
+/server/modules/fiscal/ecf/xml
+/server/modules/fiscal/ecf/signer
+/server/modules/fiscal/ecf/dgii-client
+/server/modules/fiscal/ecf/documents
+/server/modules/fiscal/ecf/contingency
+/server/modules/fiscal/ecf/received
+/server/modules/fiscal/ecf/audit
+
+NOMBRE VISIBLE DEL MENÚ
+
+“Asistente DGII”
+
+Subtítulo:
+
+“Configuración guiada para Facturación Electrónica”
+
+ESTRUCTURA DEL ASISTENTE
+
+Crear un wizard paso a paso.
+
+Cada paso debe mostrar:
+
+- Nombre del paso
+- Descripción clara
+- Estado actual
+- Datos requeridos
+- Datos faltantes
+- Validaciones
+- Evidencias adjuntas
+- Fecha de última actualización
+- Usuario que actualizó
+- Botón guardar
+- Botón continuar
+- Botón volver
+- Botón ver auditoría
+- Botón ver errores
+
+Estados visuales:
+
+- Pendiente
+- Incompleto
+- Completado
+- Con error
+- Bloqueado
+- En revisión
+- Aprobado
+- Rechazado
+
+ESTADOS GENERALES DEL ASISTENTE
+
+Crear estos estados internos:
+
+- no_iniciado
+- en_preparacion
+- requisitos_incompletos
+- requisitos_completados
+- solicitud_lista
+- solicitud_enviada
+- aprobado_para_pruebas
+- pruebas_en_proceso
+- pruebas_completadas
+- declaracion_jurada_lista
+- declaracion_jurada_enviada
+- certificado_por_dgii
+- produccion_configurada
+- produccion_activa
+- suspendido
+- rechazado
+- requiere_correccion
+
+Regla obligatoria:
+
+El sistema no puede emitir e-CF reales si el estado general no es:
+
+- certificado_por_dgii
+- produccion_configurada
+- produccion_activa
+
+Si el estado no cumple, bloquear emisión y mostrar:
+
+“La facturación electrónica aún no está lista para emitir comprobantes reales.”
+
+COMPATIBILIDAD MULTIEMPRESA O MULTISUCURSAL
+
+El módulo debe soportar tres escenarios:
+
+1. Sistema de una sola empresa.
+2. Sistema con varias sucursales.
+3. Sistema multiempresa.
+
+Por eso, toda configuración debe estar asociada a una entidad fiscal configurable.
+
+Crear el concepto:
+
+fiscal_entity
+
+Una fiscal_entity puede representar:
+- Una empresa
+- Una sucursal
+- Una razón social
+- Una unidad fiscal independiente
+
+Todas las configuraciones de DGII deben depender de fiscal_entity_id.
+
+No asumir que todo el sistema tiene un solo RNC.
+
+PASOS DEL ASISTENTE
+
+PASO 1 — DATOS DEL CONTRIBUYENTE
+
+Objetivo:
+Capturar los datos fiscales básicos del emisor.
+
+Campos:
+
+- RNC
+- Razón social
+- Nombre comercial
+- Dirección fiscal
+- Provincia
+- Municipio
+- Teléfono
+- Correo
+- Tipo de contribuyente
+- Actividad económica si aplica
+- Nombre del representante
+- Cédula del representante
+- Cargo del representante
+- Teléfono del representante
+- Correo del representante
+
+Checklist:
+
+- Está inscrito en el RNC
+- Tiene obligaciones tributarias activas
+- Tiene clave de acceso a Oficina Virtual
+- Está al día con sus obligaciones tributarias
+- Tiene autorización para emitir comprobantes fiscales
+
+Validaciones:
+
+- RNC obligatorio
+- Razón social obligatoria
+- Dirección obligatoria
+- Teléfono obligatorio
+- Correo válido
+- Representante obligatorio
+- Cédula del representante obligatoria
+- No permitir avanzar si faltan datos obligatorios
+
+Acción automática:
+
+Al guardar este paso, actualizar:
+
+- ecf_settings.rnc
+- ecf_settings.legal_name
+- ecf_settings.commercial_name
+- ecf_settings.address
+- ecf_settings.province
+- ecf_settings.municipality
+- ecf_settings.phone
+- ecf_settings.email
+- ecf_settings.representative_name
+- ecf_settings.representative_document
+- fiscal_entity fiscal data
+- estado del asistente
+
+PASO 2 — VERIFICACIÓN DE REQUISITOS DGII
+
+Objetivo:
+Confirmar los requisitos antes de solicitar autorización como emisor electrónico.
+
+Checklist:
+
+- Inscripción en RNC confirmada
+- Obligaciones tributarias confirmadas
+- Acceso a Oficina Virtual confirmado
+- Formulario de solicitud disponible
+- Certificado digital disponible o en proceso
+- Software preparado para emitir e-CF
+- Software preparado para recibir e-CF
+- Software preparado para Acuse de Recibo
+- Software preparado para Aprobación Comercial
+- Software preparado para Representación Impresa
+- Cumplimiento de comprobantes fiscales
+
+Campos:
+
+- Fecha de revisión
+- Responsable interno
+- Observaciones
+- Evidencia adjunta opcional
+
+Acción automática:
+
+Si todos los requisitos obligatorios están marcados, cambiar estado a:
+
+requisitos_completados
+
+Si faltan requisitos, cambiar estado a:
+
+requisitos_incompletos
+
+PASO 3 — CERTIFICADO DIGITAL
+
+Objetivo:
+Registrar y proteger el certificado digital para procesos tributarios.
+
+Campos:
+
+- Nombre del titular del certificado
+- Cédula del titular
+- Entidad certificadora
+- Fecha de emisión
+- Fecha de vencimiento
+- Archivo del certificado
+- Contraseña del certificado
+- Confirmación de que corresponde al representante autorizado
+
+Validaciones:
+
+- Archivo obligatorio
+- Contraseña obligatoria
+- Fecha de vencimiento obligatoria
+- No permitir certificado vencido
+- Alertar si vence pronto
+- No mostrar la contraseña después de guardada
+
+Seguridad:
+
+- Guardar contraseña cifrada
+- Guardar archivo en ruta protegida
+- No exponer certificado públicamente
+- No enviar contraseña al frontend después de guardarla
+- Registrar auditoría al cargar, reemplazar o eliminar certificado
+
+Estados del certificado:
+
+- no_cargado
+- cargado
+- valido
+- vencido
+- error
+- por_vencer
+
+Acciones:
+
+- Subir certificado
+- Validar certificado
+- Reemplazar certificado
+- Ver fecha de vencimiento
+- Ver estado
+- Probar firma local
+
+PASO 4 — SOLICITUD DE EMISOR ELECTRÓNICO
+
+Objetivo:
+Registrar el proceso de solicitud ante DGII.
+
+Campos:
+
+- Fecha de solicitud
+- Estado de solicitud
+- Número de referencia si aplica
+- Evidencia adjunta
+- Usuario o acceso recibido si aplica
+- Observaciones
+- Respuesta recibida de DGII
+
+Estados:
+
+- no_iniciada
+- en_preparacion
+- enviada
+- en_revision
+- aprobada_para_pruebas
+- rechazada
+- requiere_correccion
+
+Checklist:
+
+- Datos del contribuyente completos
+- Requisitos DGII completados
+- Certificado digital registrado
+- Formulario preparado
+- Responsable confirmado
+
+Acción automática:
+
+Si la solicitud es marcada como aprobada para pruebas, cambiar estado general del asistente a:
+
+aprobado_para_pruebas
+
+PASO 5 — AMBIENTE DE PRUEBAS
+
+Objetivo:
+Configurar el entorno de pruebas para certificación DGII.
+
+Campos:
+
+- URL autenticación pruebas
+- URL recepción e-CF pruebas
+- URL aprobación comercial pruebas
+- URL consulta estado pruebas
+- Usuario o credencial si aplica
+- Token si aplica
+- Certificado seleccionado
+- Ambiente activo: pruebas
+
+Botones:
+
+- Probar autenticación
+- Probar certificado
+- Probar firma digital
+- Probar conexión
+- Ver logs técnicos
+
+Reglas:
+
+- No permitir pruebas si no hay certificado válido
+- No permitir pruebas si faltan URLs obligatorias
+- No marcar como exitoso si no hubo respuesta real
+- Si solo se valida internamente, mostrar “Prueba local exitosa”
+- Si se comunica con DGII, guardar request, response, fecha y resultado
+
+PASO 6 — SETS DE PRUEBAS
+
+Objetivo:
+Gestionar las pruebas requeridas para certificación.
+
+Tipos de pruebas:
+
+- Pruebas de Datos
+- Pruebas de Simulación
+- Pruebas de Comunicación
+
+Funciones:
+
+- Crear set de prueba
+- Subir archivo del set
+- Registrar casos
+- Generar XML por caso
+- Firmar XML
+- Enviar XML
+- Consultar estado
+- Guardar TrackID
+- Guardar respuesta DGII
+- Marcar aceptado
+- Marcar rechazado
+- Ver error
+- Corregir y reenviar
+- Adjuntar evidencia
+- Ver porcentaje de avance
+
+Estados por caso:
+
+- pendiente
+- generado
+- firmado
+- enviado
+- aceptado
+- rechazado
+- corregido
+- reenviado
+- completado
+
+Reglas:
+
+- No permitir marcar caso como completado sin evidencia
+- No permitir avanzar a Declaración Jurada si hay pruebas pendientes
+- No permitir alterar XML aceptado
+- Si se corrige un XML, crear nueva versión
+- Guardar auditoría por cada intento
+
+PASO 7 — REPRESENTACIÓN IMPRESA
+
+Objetivo:
+Configurar y validar la Representación Impresa del e-CF.
+
+Debe incluir:
+
+- Logo configurable
+- Razón social
+- Nombre comercial
+- RNC emisor
+- Dirección fiscal
+- Teléfono
+- Correo
+- Tipo de e-CF
+- e-NCF
+- Fecha de emisión
+- Datos del comprador
+- Detalle de productos o servicios
+- Subtotal
+- Descuentos
+- ITBIS
+- Total
+- Código QR
+- Código de seguridad si aplica
+- Fecha de firma digital
+- Ambiente: PRUEBAS o PRODUCCIÓN
+- Mensaje legal correspondiente
+
+Formatos:
+
+- PDF tamaño carta
+- Ticket térmico 80mm
+- Ticket térmico 58mm
+- Vista previa web
+- Descarga PDF
+
+Reglas:
+
+- No generar Representación Impresa sin e-CF generado
+- No usar datos quemados
+- El logo debe venir de configuración
+- El RNC debe venir de la entidad fiscal activa
+- El ambiente debe verse claramente
+
+PASO 8 — DECLARACIÓN JURADA
+
+Objetivo:
+Preparar el cierre de certificación después de completar pruebas.
+
+Checklist:
+
+- Pruebas de datos completadas
+- Pruebas de simulación completadas
+- Pruebas de comunicación completadas
+- Representación Impresa validada
+- Certificado digital activo
+- Evidencias disponibles
+- Logs disponibles
+- Casos rechazados corregidos
+
+Campos:
+
+- Fecha
+- Responsable
+- Estado
+- Evidencia adjunta
+- Comentario
+
+Estados:
+
+- pendiente
+- lista_para_declarar
+- declarada
+- en_revision
+- aprobada
+- rechazada
+
+Reglas:
+
+- No permitir marcar como lista si faltan pruebas
+- No permitir marcar declarada sin confirmación
+- Registrar auditoría
+
+PASO 9 — CERTIFICACIÓN DGII
+
+Objetivo:
+Registrar la certificación como emisor electrónico.
+
+Campos:
+
+- Fecha de certificación
+- Estado
+- Referencia DGII
+- Evidencia adjunta
+- Observaciones
+- Usuario responsable
+- Fecha de habilitación
+
+Estados:
+
+- pendiente
+- en_revision
+- certificado
+- rechazado
+- suspendido
+
+Acción automática:
+
+Si se marca como certificado:
+
+- Cambiar estado general a certificado_por_dgii
+- Habilitar configuración de producción
+- Habilitar registro de rangos e-NCF
+- Mantener bloqueada emisión real hasta completar producción y rangos
+- Registrar auditoría fuerte
+
+PASO 10 — RANGOS e-NCF
+
+Objetivo:
+Registrar las secuencias autorizadas de e-NCF.
+
+Campos:
+
+- Tipo de e-CF
+- Serie
+- Rango desde
+- Rango hasta
+- Próximo número
+- Fecha de autorización
+- Fecha de vencimiento si aplica
+- Ambiente
+- Estado
+- Alerta mínima
+
+Reglas:
+
+- No duplicar e-NCF
+- No reutilizar e-NCF
+- No editar rango usado
+- No emitir si no hay rango activo
+- No emitir si rango agotado
+- No emitir si rango vencido
+- Alertar cuando queden pocos números
+
+Tipos de documentos:
+
+- Factura de Crédito Fiscal Electrónica
+- Factura de Consumo Electrónica
+- Nota de Débito Electrónica
+- Nota de Crédito Electrónica
+- Compras Electrónico si aplica
+- Gubernamental Electrónico si aplica
+- Regímenes Especiales si aplica
+- Exportaciones si aplica
+- Pagos al Exterior si aplica
+
+PASO 11 — AMBIENTE DE PRODUCCIÓN
+
+Objetivo:
+Configurar producción real.
+
+Campos:
+
+- URL autenticación producción
+- URL recepción e-CF producción
+- URL aprobación comercial producción
+- URL consulta estado producción
+- Certificado producción
+- Estado de autorización
+- Fecha de inicio
+- Producción activa sí/no
+
+Botones:
+
+- Probar conexión producción
+- Probar certificado
+- Activar producción
+- Desactivar producción
+
+Reglas:
+
+- No activar producción si no está certificado por DGII
+- No activar producción sin certificado válido
+- No activar producción sin rangos e-NCF activos
+- No activar producción si faltan endpoints
+- No activar producción si hay errores críticos
+- Registrar auditoría fuerte
+- Mostrar confirmación antes de activar producción
+
+Mensaje antes de activar:
+
+“Está a punto de activar la facturación electrónica en producción. A partir de este momento, los comprobantes electrónicos generados serán tratados como documentos fiscales reales. ¿Desea continuar?”
+
+PASO 12 — CONTINGENCIA
+
+Objetivo:
+Configurar y controlar la emisión en contingencia.
+
+Funciones:
+
+- Detectar falta de internet
+- Detectar DGII no disponible
+- Generar e-CF offline si aplica
+- Firmar XML si el certificado está disponible
+- Guardar en cola pendiente
+- Reintentar envío automáticamente
+- Mostrar horas restantes
+- Alertar antes de 72 horas
+- Bloquear o alertar según política configurada
+- Guardar logs completos
+
+Campos de la cola:
+
+- e-CF
+- Factura relacionada
+- Motivo
+- Estado
+- Fecha de emisión
+- Fecha límite
+- Horas restantes
+- Intentos
+- Último error
+- Próximo intento
+
+Estados:
+
+- pendiente_envio
+- enviando
+- enviado
+- aceptado
+- rechazado
+- vencido
+- error
+
+Reglas:
+
+- Para falta de conectividad, controlar plazo máximo de 72 horas
+- No perder XML
+- No perder factura
+- No duplicar envío
+- No reasignar e-NCF
+- Registrar cada intento
+
+PASO 13 — RECEPCIÓN DE e-CF DE PROVEEDORES
+
+Objetivo:
+Permitir recibir y procesar e-CF emitidos por proveedores.
+
+Funciones:
+
+- Subir XML recibido
+- Validar estructura
+- Validar firma si aplica
+- Registrar proveedor
+- Asociar compra
+- Generar acuse de recibo si aplica
+- Registrar aprobación comercial
+- Registrar rechazo comercial
+- Guardar evidencia
+- Consultar historial
+
+Estados:
+
+- recibido
+- validado
+- aceptado_comercialmente
+- rechazado_comercialmente
+- asociado_a_compra
+- archivado
+
+BASE DE DATOS SUGERIDA
+
+Crear tablas reutilizables:
+
+1. fiscal_entities
+- id
+- name
+- legal_name
+- commercial_name
+- rnc
+- address
+- province
+- municipality
+- phone
+- email
+- logo_url
+- entity_type
+- status
+- created_at
+- updated_at
+
+2. ecf_assistant_status
+- id
+- fiscal_entity_id
+- current_step
+- general_status
+- progress_percentage
+- last_completed_step
+- last_error
+- production_ready
+- production_active
+- created_at
+- updated_at
+
+3. ecf_settings
+- id
+- fiscal_entity_id
+- environment
+- status
+- rnc
+- legal_name
+- commercial_name
+- address
+- province
+- municipality
+- phone
+- email
+- representative_name
+- representative_document
+- certificate_id
+- test_auth_url
+- test_reception_url
+- test_approval_url
+- test_status_url
+- prod_auth_url
+- prod_reception_url
+- prod_approval_url
+- prod_status_url
+- production_enabled
+- certified_at
+- created_at
+- updated_at
+
+4. ecf_certificates
+- id
+- fiscal_entity_id
+- holder_name
+- holder_document
+- provider_name
+- issued_at
+- expires_at
+- encrypted_file_path
+- encrypted_password
+- status
+- last_validation_at
+- last_validation_result
+- created_at
+- updated_at
+
+5. ecf_ranges
+- id
+- fiscal_entity_id
+- ecf_type
+- serie
+- range_from
+- range_to
+- next_number
+- environment
+- status
+- alert_threshold
+- issued_count
+- remaining_count
+- created_at
+- updated_at
+
+6. ecf_documents
+- id
+- fiscal_entity_id
+- related_document_id
+- related_document_type
+- ecf_number
+- ecf_type
+- environment
+- buyer_rnc
+- buyer_name
+- subtotal
+- tax_total
+- discount_total
+- total
+- xml_path
+- signed_xml_path
+- pdf_path
+- qr_data
+- security_code
+- digital_signature_date
+- track_id
+- dgii_status
+- dgii_response_json
+- status
+- rejection_reason
+- last_error
+- issued_at
+- signed_at
+- sent_at
+- accepted_at
+- rejected_at
+- created_at
+- updated_at
+
+7. ecf_events
+- id
+- ecf_document_id
+- fiscal_entity_id
+- event_type
+- old_status
+- new_status
+- message
+- request_payload_path
+- response_payload_json
+- user_id
+- created_at
+
+8. ecf_test_sets
+- id
+- fiscal_entity_id
+- name
+- test_type
+- status
+- uploaded_file_path
+- progress
+- created_at
+- updated_at
+
+9. ecf_test_cases
+- id
+- test_set_id
+- case_code
+- description
+- expected_document_type
+- status
+- generated_xml_path
+- signed_xml_path
+- dgii_response_json
+- track_id
+- error_message
+- created_at
+- updated_at
+
+10. ecf_contingency_queue
+- id
+- fiscal_entity_id
+- ecf_document_id
+- related_document_id
+- ecf_number
+- reason
+- status
+- attempts
+- emitted_at
+- deadline_at
+- last_attempt_at
+- next_retry_at
+- last_error
+- created_at
+- updated_at
+
+11. received_ecf
+- id
+- fiscal_entity_id
+- supplier_id
+- ecf_number
+- issuer_rnc
+- issuer_name
+- xml_path
+- signed_xml_path
+- total
+- tax_total
+- issue_date
+- status
+- commercial_approval_status
+- received_at
+- processed_at
+- created_at
+- updated_at
+
+12. ecf_audit_logs
+- id
+- fiscal_entity_id
+- user_id
+- action
+- module
+- entity_type
+- entity_id
+- old_value_json
+- new_value_json
+- ip_address
+- user_agent
+- created_at
+
+ENDPOINTS SUGERIDOS
+
+Crear endpoints reutilizables:
+
+GET /api/fiscal/entities
+POST /api/fiscal/entities
+GET /api/fiscal/entities/:id
+
+GET /api/fiscal/ecf/assistant/:fiscalEntityId/status
+POST /api/fiscal/ecf/assistant/:fiscalEntityId/step/1-taxpayer
+POST /api/fiscal/ecf/assistant/:fiscalEntityId/step/2-requirements
+POST /api/fiscal/ecf/assistant/:fiscalEntityId/step/3-certificate
+POST /api/fiscal/ecf/assistant/:fiscalEntityId/step/4-request
+POST /api/fiscal/ecf/assistant/:fiscalEntityId/step/5-test-environment
+POST /api/fiscal/ecf/assistant/:fiscalEntityId/step/6-test-sets
+POST /api/fiscal/ecf/assistant/:fiscalEntityId/step/7-printed-representation
+POST /api/fiscal/ecf/assistant/:fiscalEntityId/step/8-sworn-statement
+POST /api/fiscal/ecf/assistant/:fiscalEntityId/step/9-certification
+POST /api/fiscal/ecf/assistant/:fiscalEntityId/step/10-ranges
+POST /api/fiscal/ecf/assistant/:fiscalEntityId/step/11-production
+POST /api/fiscal/ecf/assistant/:fiscalEntityId/step/12-contingency
+POST /api/fiscal/ecf/assistant/:fiscalEntityId/step/13-received-ecf
+
+POST /api/fiscal/ecf/:fiscalEntityId/certificates/upload
+POST /api/fiscal/ecf/:fiscalEntityId/certificates/validate
+
+GET /api/fiscal/ecf/:fiscalEntityId/ranges
+POST /api/fiscal/ecf/:fiscalEntityId/ranges
+PUT /api/fiscal/ecf/:fiscalEntityId/ranges/:rangeId
+
+POST /api/fiscal/ecf/:fiscalEntityId/documents/issue
+GET /api/fiscal/ecf/:fiscalEntityId/documents
+GET /api/fiscal/ecf/:fiscalEntityId/documents/:id
+POST /api/fiscal/ecf/:fiscalEntityId/documents/:id/send
+POST /api/fiscal/ecf/:fiscalEntityId/documents/:id/status
+GET /api/fiscal/ecf/:fiscalEntityId/documents/:id/xml
+GET /api/fiscal/ecf/:fiscalEntityId/documents/:id/pdf
+
+GET /api/fiscal/ecf/:fiscalEntityId/contingency
+POST /api/fiscal/ecf/:fiscalEntityId/contingency/retry
+
+POST /api/fiscal/ecf/:fiscalEntityId/received/upload
+POST /api/fiscal/ecf/:fiscalEntityId/received/:id/approve
+POST /api/fiscal/ecf/:fiscalEntityId/received/:id/reject
+
+FLUJO DE EMISIÓN DE e-CF
+
+Cuando el sistema necesite emitir un e-CF:
+
+1. Recibir documento origen: venta, factura, nota de crédito, nota de débito u otro.
+2. Identificar fiscal_entity_id.
+3. Validar que el asistente esté completado.
+4. Validar producción activa o ambiente correcto.
+5. Validar certificado vigente.
+6. Validar rango e-NCF activo.
+7. Reservar próximo e-NCF de forma transaccional.
+8. Generar XML.
+9. Firmar XML.
+10. Guardar XML y XML firmado.
+11. Enviar a DGII.
+12. Guardar respuesta.
+13. Consultar estado si aplica.
+14. Cambiar estado del e-CF.
+15. Generar Representación Impresa.
+16. Asociar e-CF al documento origen.
+17. Registrar auditoría.
+
+VALIDACIONES CRÍTICAS
+
+Antes de emitir:
+
+- Debe existir fiscal_entity_id.
+- Debe existir configuración fiscal completa.
+- Debe existir certificado válido.
+- Debe existir rango e-NCF activo.
+- El asistente debe estar certificado/configurado.
+- Si es producción, producción debe estar activa.
+- El documento origen debe tener totales válidos.
+- El e-NCF debe reservarse con bloqueo transaccional.
+- No se puede emitir si hay configuración incompleta.
+- No se puede emitir si el certificado está vencido.
+- No se puede emitir si el rango está agotado.
+
+AUDITORÍA OBLIGATORIA
+
+Registrar auditoría para:
+
+- Guardar datos del contribuyente
+- Cambiar requisitos
+- Subir certificado
+- Reemplazar certificado
+- Configurar ambiente de pruebas
+- Configurar producción
+- Activar producción
+- Crear rango e-NCF
+- Editar rango e-NCF
+- Generar e-CF
+- Firmar e-CF
+- Enviar e-CF
+- Recibir respuesta DGII
+- Rechazo DGII
+- Reintento de envío
+- Activación de contingencia
+- Recepción de e-CF de proveedor
+- Aprobación comercial
+- Rechazo comercial
+
+SEGURIDAD
+
+Implementar:
+
+- Permisos por módulo
+- Permisos por acción
+- Cifrado de contraseñas de certificado
+- Protección de archivos fiscales
+- Logs técnicos
+- Validación backend
+- Validación frontend
+- Sesiones seguras
+- Auditoría de cambios críticos
+- Bloqueo de acciones peligrosas sin permiso
+
+Permisos sugeridos:
+
+fiscal.ecf.ver
+fiscal.ecf.configurar
+fiscal.ecf.subir_certificado
+fiscal.ecf.validar_certificado
+fiscal.ecf.configurar_pruebas
+fiscal.ecf.gestionar_sets
+fiscal.ecf.declaracion_jurada
+fiscal.ecf.certificacion
+fiscal.ecf.configurar_rangos
+fiscal.ecf.configurar_produccion
+fiscal.ecf.activar_produccion
+fiscal.ecf.emitir
+fiscal.ecf.reenviar
+fiscal.ecf.ver_xml
+fiscal.ecf.ver_pdf
+fiscal.ecf.contingencia
+fiscal.ecf.recibidos
+fiscal.ecf.auditoria
+
+INTERFAZ
+
+El asistente debe ser claro, profesional y guiado.
+
+Debe mostrar:
+
+- Barra de progreso
+- Pasos numerados
+- Estado por paso
+- Alertas de errores
+- Requisitos faltantes
+- Botones claros
+- Mensajes de ayuda
+- Evidencias adjuntas
+- Historial de cambios
+- Estado de producción
+- Estado del certificado
+- Estado de rangos e-NCF
+- Estado de comunicación con DGII
+
+Textos importantes:
+
+Si falta certificado:
+“No puede continuar porque no hay certificado digital válido.”
+
+Si faltan rangos:
+“No puede emitir comprobantes electrónicos porque no existen rangos e-NCF activos.”
+
+Si producción no está activa:
+“El sistema está configurado, pero producción aún no está activa.”
+
+Si DGII rechaza:
+“El comprobante fue rechazado por DGII. Revise el detalle del error antes de reenviar.”
+
+Si está en contingencia:
+“El comprobante fue generado en contingencia y está pendiente de envío a DGII.”
+
+ENTREGABLES
+
+Al terminar, deben existir:
+
+1. Asistente DGII completo.
+2. Base de datos para configuración fiscal.
+3. Pantallas de cada paso.
+4. Guardado real de cada paso.
+5. Validaciones reales.
+6. Carga segura del certificado.
+7. Configuración de pruebas.
+8. Configuración de producción.
+9. Registro de rangos e-NCF.
+10. Generación de e-CF.
+11. Firma de XML.
+12. Cliente DGII preparado.
+13. Representación Impresa.
+14. Cola de contingencia.
+15. Reintentos de envío.
+16. Recepción de e-CF de proveedores.
+17. Auditoría fiscal.
+18. Permisos.
+19. Logs técnicos.
+20. Documentación de uso.
+
+DOCUMENTACIÓN
+
+Crear archivo:
+
+docs/ASISTENTE_DGII.md
+
+Debe explicar:
+
+- Qué hace el asistente
+- Qué datos pide
+- Qué pasos tiene
+- Qué valida cada paso
+- Cómo se activa producción
+- Cómo se registran rangos e-NCF
+- Cómo se carga certificado
+- Cómo se emite e-CF
+- Cómo funciona contingencia
+- Cómo revisar errores
+- Qué falta si DGII no responde
+- Qué partes dependen de endpoints reales
+
+PRUEBA OBLIGATORIA
+
+Crear una prueba manual documentada:
+
+1. Crear fiscal_entity.
+2. Completar datos del contribuyente.
+3. Completar requisitos.
+4. Subir certificado de prueba.
+5. Configurar ambiente de pruebas.
+6. Crear set de prueba.
+7. Generar XML de prueba.
+8. Firmar XML.
+9. Generar Representación Impresa.
+10. Marcar pruebas completadas con evidencia.
+11. Registrar declaración jurada.
+12. Registrar certificación.
+13. Crear rango e-NCF.
+14. Configurar producción.
+15. Intentar activar producción sin un requisito faltante.
+16. Verificar que el sistema bloquee.
+17. Completar requisito faltante.
+18. Activar producción.
+19. Emitir e-CF desde documento de prueba.
+20. Ver XML, PDF, estado y auditoría.
+
+NO FINALICES HASTA QUE
+
+- El asistente esté visualmente completo.
+- Los pasos guarden datos reales.
+- Las validaciones funcionen.
+- La configuración no esté amarrada a ninguna empresa.
+- El módulo sea reutilizable.
+- El sistema bloquee emisión si falta configuración.
+- El sistema registre auditoría.
+- El código quede organizado.
+- La documentación quede creada.

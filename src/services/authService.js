@@ -1,32 +1,41 @@
 import { MENUS } from '../constants.js';
-import { loginByRole } from './apiClient.js';
+import { loginWithCredentials, loadSavedSession, clearSession } from './apiClient.js';
 
-let currentUser = {
-  id: 'u-admin',
-  username: 'admin',
-  nombre: 'Administrador General',
-  rol: 'admin',
-  sucursal_id: 'suc-1',
-};
+let currentUser = null;
 
-export async function loginAs(role) {
-  const user = await loginByRole(role);
+export function getStoredUser() {
+  const u = loadSavedSession();
+  if (u) { currentUser = u; }
+  return currentUser;
+}
+
+export async function loginAs(username, password) {
+  const user = await loginWithCredentials(username, password);
   currentUser = user;
   return currentUser;
+}
+
+export function logout() {
+  currentUser = null;
+  clearSession();
 }
 
 export function getCurrentUser() {
   return currentUser;
 }
 
+export function isLoggedIn() {
+  return currentUser !== null;
+}
+
 export function getRoleMenu() {
-  return MENUS[currentUser.rol];
+  return MENUS[currentUser?.rol] || [];
 }
 
 export function canEdit() {
-  return currentUser.rol !== 'contable';
+  return currentUser?.rol !== 'contable';
 }
 
 export function canAccessAdminOnly() {
-  return currentUser.rol === 'admin';
+  return currentUser?.rol === 'admin';
 }

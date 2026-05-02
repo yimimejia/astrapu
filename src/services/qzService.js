@@ -64,14 +64,30 @@ export async function connectQZ() {
     });
 
     if (!qz.websocket.isActive()) {
-      await qz.websocket.connect({
-        host: ['localhost'],
-        port: { secure: [8183, 8181], insecure: [8182, 8080] },
-        usingSecure: location.protocol === 'https:',
-        keepAlive: 60,
-        retries: 1,
-        delay: 0,
-      });
+      // Intenta WSS primero (necesario cuando la app está en HTTPS).
+      // Si falla, reintenta con WS inseguro (QZ Tray local no siempre
+      // tiene WSS habilitado dependiendo de la versión/OS).
+      const isHttps = location.protocol === 'https:';
+      try {
+        await qz.websocket.connect({
+          host: ['localhost', '127.0.0.1'],
+          port: { secure: [8183, 8181], insecure: [8182, 8080] },
+          usingSecure: isHttps,
+          keepAlive: 60,
+          retries: 2,
+          delay: 1,
+        });
+      } catch (firstErr) {
+        // Fallback: intenta con el modo opuesto
+        await qz.websocket.connect({
+          host: ['localhost', '127.0.0.1'],
+          port: { secure: [8183, 8181], insecure: [8182, 8080] },
+          usingSecure: !isHttps,
+          keepAlive: 60,
+          retries: 2,
+          delay: 1,
+        });
+      }
     }
 
     // setSignatureAlgorithm DESPUÉS de connect(): así QZ Tray ya marcó la compatibilidad

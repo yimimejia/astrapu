@@ -1,14 +1,6 @@
-const ROLE_CREDS = {
-  admin: { username: 'admin', password: 'admin123' },
-  envios: { username: 'm.perez', password: 'envios123' },
-  entrega: { username: 'j.rodriguez', password: 'entrega123' },
-  contable: { username: 'contable', password: 'contable123' },
-};
-
 let token = null;
 
-function tokenKey(role) { return `astrapu_token_${role}`; }
-function userKey(role) { return `astrapu_user_${role}`; }
+const SESSION_KEY = 'astrapu_session_v2';
 
 function isTokenValid(t) {
   if (!t) return false;
@@ -18,16 +10,27 @@ function isTokenValid(t) {
   } catch { return false; }
 }
 
-function loadCachedSession(role) {
-  const t = sessionStorage.getItem(tokenKey(role));
-  const u = sessionStorage.getItem(userKey(role));
-  if (isTokenValid(t) && u) return { token: t, user: JSON.parse(u) };
+export function loadSavedSession() {
+  try {
+    const raw = sessionStorage.getItem(SESSION_KEY);
+    if (!raw) return null;
+    const { token: t, user } = JSON.parse(raw);
+    if (isTokenValid(t) && user) {
+      token = t;
+      return user;
+    }
+  } catch { }
   return null;
 }
 
-function saveSession(role, t, user) {
-  sessionStorage.setItem(tokenKey(role), t);
-  sessionStorage.setItem(userKey(role), JSON.stringify(user));
+export function saveSession(t, user) {
+  token = t;
+  sessionStorage.setItem(SESSION_KEY, JSON.stringify({ token: t, user }));
+}
+
+export function clearSession() {
+  token = null;
+  sessionStorage.removeItem(SESSION_KEY);
 }
 
 function extractApiError(json, fallback = 'Error API') {
@@ -37,23 +40,15 @@ function extractApiError(json, fallback = 'Error API') {
   return fallback;
 }
 
-export async function loginByRole(role) {
-  const cached = loadCachedSession(role);
-  if (cached) {
-    token = cached.token;
-    return cached.user;
-  }
-
-  const creds = ROLE_CREDS[role];
+export async function loginWithCredentials(username, password) {
   const res = await fetch('/api/auth/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(creds),
+    body: JSON.stringify({ username, password }),
   });
   const json = await res.json();
-  if (!res.ok) throw new Error(extractApiError(json, 'No se pudo autenticar'));
-  token = json.data.token;
-  saveSession(role, token, json.data.user);
+  if (!res.ok) throw new Error(extractApiError(json, 'Credenciales inválidas'));
+  saveSession(json.data.token, json.data.user);
   return json.data.user;
 }
 
