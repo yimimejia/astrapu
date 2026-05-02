@@ -293,15 +293,10 @@ function escposTicket(data) {
     `\n${msgFinal}\n`,
     NORMAL,
 
-    // ── FEED + CUT ───────────────────────────────────────────────────────
-    // Avanza varias líneas para que el corte caiga DESPUÉS del último texto
-    // (la cuchilla está ~10-20 mm por encima del cabezal en la mayoría de
-    // las térmicas de 80 mm).
-    '\x1B\x64\x06',                                // ESC d 6 → feed 6 lines
-    // GS V B 0 → corte parcial (Function B). Es el comando de corte más
-    // compatible entre marcas (Epson, Bixolon, Xprinter, Star, etc.).
-    // Si la cuchilla soporta corte total, también lo ejecuta.
-    '\x1D\x56\x42\x00',
+    // El feed + corte se envía aparte como HEX en rawPrint() para que ningún
+    // encoder filtre los bytes de control. Aquí solo dejamos un par de líneas
+    // de margen visual al final del cuerpo.
+    '\n\n',
   ].join('');
 }
 
@@ -412,8 +407,29 @@ function zplLabel(data) {
 async function rawPrint(printerName, payload) {
   if (!state.connected || !window.qz) return { ok: false, error: 'QZ no conectado' };
   try {
-    const config = window.qz.configs.create(printerName);
-    await window.qz.print(config, [{ type: 'raw', format: 'plain', data: payload }]);
+    // En Windows muchos drivers absorben/filtran los bytes de control ESC/POS
+    // (incluido el corte GS V). Las opciones críticas son:
+    //   - altPrinting: true → QZ Tray escribe directo al puerto (BYPASS al driver
+    //                         gráfico de Windows). Sin esto, el driver puede tragarse
+    //                         el comando de corte y otros bytes < 0x20.
+    //   - encoding: 'CP437' → evita que el JVM convierta a UTF-8 los bytes altos.
+    const config = window.qz.configs.create(printerName, {
+      altPrinting: true,
+      encoding: 'CP437',
+    });
+    // Envío en dos partes:
+    //   1) El cuerpo del ticket como texto plano (rápido y legible).
+    //   2) El comando feed + corte como HEX puro al final, para que ningún
+    //      paso intermedio (encoding/spooler) lo filtre.
+    //      1B 64 06   = ESC d 6   → avanza 6 líneas
+    //      1D 56 42 00 = GS V B 0 → corte parcial (Function B, el más compatible)
+    //      1D 56 00   = GS V 0    → corte total (algunas térmicas viejas solo lo aceptan así)
+    await window.qz.print(config, [
+      { type: 'raw', format: 'plain', flavor: 'plain', data: payload },
+      { type: 'raw', format: 'hex',   data: '1B6406' },
+      { type: 'raw', format: 'hex',   data: '1D564200' },
+      { type: 'raw', format: 'hex',   data: '1D5600' },
+    ]);
     return { ok: true };
   } catch (error) {
     return { ok: false, error: String(error) };
