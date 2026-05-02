@@ -131,8 +131,28 @@ opsRoutes.post('/paquetes/scan-receive', opsScanLimiter, forbidReadOnlyMutations
 
 opsRoutes.get('/paquetes/search', opsSearchLimiter, async (req, res) => {
   const phone = String(req.query.phone || '').replace(/\D/g, '');
-  const rows = await all('SELECT p.*, c.nombre as cliente_nombre, c.cedula FROM paquetes p JOIN clientes c ON c.id = p.cliente_id WHERE p.telefono_destinatario LIKE ? ORDER BY p.created_at DESC LIMIT 50', [`%${phone}%`]);
-  await writeAudit({ req, modulo: 'entrega', accion: 'busqueda_sensible', entidad: 'paquetes', entidadId: phone || 'all' });
+  const code  = String(req.query.code || '').trim();
+
+  let rows;
+  if (code) {
+    // Match exacto por guía o código de barras (escaneo de pistola)
+    rows = await all(
+      `SELECT p.*, c.nombre as cliente_nombre, c.cedula
+       FROM paquetes p JOIN clientes c ON c.id = p.cliente_id
+       WHERE p.guia = ? OR p.codigo_barras = ?
+       ORDER BY p.created_at DESC LIMIT 5`,
+      [code, code],
+    );
+  } else {
+    rows = await all(
+      `SELECT p.*, c.nombre as cliente_nombre, c.cedula
+       FROM paquetes p JOIN clientes c ON c.id = p.cliente_id
+       WHERE p.telefono_destinatario LIKE ?
+       ORDER BY p.created_at DESC LIMIT 50`,
+      [`%${phone}%`],
+    );
+  }
+  await writeAudit({ req, modulo: 'entrega', accion: 'busqueda_sensible', entidad: 'paquetes', entidadId: code || phone || 'all' });
   res.json({ ok: true, data: rows });
 });
 

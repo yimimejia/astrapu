@@ -1052,44 +1052,108 @@ function wireScanning() {
 // ─── BUSQUEDA ─────────────────────────────────────────────────────────────────
 
 function wireBusqueda() {
-  const input = document.getElementById('buscarTelefono');
-  const result = document.getElementById('resultadoBusqueda');
-  if (!input || !result) return;
+  const inputPhone = document.getElementById('buscarTelefono');
+  const inputCode  = document.getElementById('buscarCodigo');
+  const codeFb     = document.getElementById('buscarCodigoFeedback');
+  const result     = document.getElementById('resultadoBusqueda');
+  if (!result) return;
 
-  const renderResults = async () => {
+  const goToDeliver = (paqueteId) => {
+    selectedDeliveryPackage = paqueteId;
+    currentView = 'entregar_paquete';
+    logAudit({ modulo: 'entrega', accion: 'busqueda_sensible', entidad: 'paquetes', entidad_id: paqueteId });
+    render();
+  };
+
+  const renderCards = (rows) => {
+    result.innerHTML = rows.map((p) => {
+      const client = db.clientes.find((c) => c.id === p.cliente_id);
+      const action = p.estado === 'DISPONIBLE'
+        ? `<button class="btn primary" data-select-delivery="${p.id}">Ir a entregar</button>`
+        : `<span class="badge ${p.estado.toLowerCase()}">${p.estado === 'EN_TRANSITO' ? 'En camino' : p.estado === 'PENDIENTE' ? 'Aún no ha salido' : p.estado === 'ENTREGADO' ? 'Ya entregado' : p.estado}</span>`;
+
+      return `<article class="result-card">
+        <h4>${p.guia}</h4>
+        <p><b>Nombre:</b> ${p.cliente_nombre || client?.nombre || '-'}</p>
+        <p><b>Teléfono:</b> ${p.telefono_destinatario}</p>
+        <p><b>Origen:</b> ${db.sucursales.find((s) => s.id === p.sucursal_origen)?.nombre || '-'}</p>
+        <p><b>Destino:</b> ${db.sucursales.find((s) => s.id === p.sucursal_destino)?.nombre || '-'}</p>
+        <p><b>Estado:</b> ${p.estado}</p>
+        <p><b>Registro:</b> ${(p.created_at || '').slice(0, 16).replace('T', ' ')}</p>
+        ${action}
+      </article>`;
+    }).join('') || '<p class="hint">Sin resultados.</p>';
+
+    result.querySelectorAll('[data-select-delivery]').forEach((btn) =>
+      btn.addEventListener('click', () => goToDeliver(btn.dataset.selectDelivery)),
+    );
+  };
+
+  const searchByPhone = async () => {
+    if (!inputPhone) return;
     try {
-      const rows = await api(`/api/ops/paquetes/search?phone=${encodeURIComponent(input.value.replace(/\D/g, ''))}`).then((r) => r.data || []);
-      result.innerHTML = rows.map((p) => {
-        const client = db.clientes.find((c) => c.id === p.cliente_id);
-        const action = p.estado === 'DISPONIBLE'
-          ? `<button class="btn primary" data-select-delivery="${p.id}">Ir a entregar</button>`
-          : `<span class="badge ${p.estado.toLowerCase()}">${p.estado === 'EN_TRANSITO' ? 'En camino' : p.estado === 'PENDIENTE' ? 'Aún no ha salido' : p.estado === 'ENTREGADO' ? 'Ya entregado' : p.estado}</span>`;
-
-        return `<article class="result-card">
-          <h4>${p.guia}</h4>
-          <p><b>Nombre:</b> ${p.cliente_nombre || client?.nombre || '-'}</p>
-          <p><b>Teléfono:</b> ${p.telefono_destinatario}</p>
-          <p><b>Origen:</b> ${db.sucursales.find((s) => s.id === p.sucursal_origen)?.nombre || '-'}</p>
-          <p><b>Destino:</b> ${db.sucursales.find((s) => s.id === p.sucursal_destino)?.nombre || '-'}</p>
-          <p><b>Estado:</b> ${p.estado}</p>
-          <p><b>Registro:</b> ${(p.created_at || '').slice(0, 16).replace('T', ' ')}</p>
-          ${action}
-        </article>`;
-      }).join('') || '<p class="hint">Sin resultados.</p>';
-
-      result.querySelectorAll('[data-select-delivery]').forEach((btn) => btn.addEventListener('click', () => {
-        selectedDeliveryPackage = btn.dataset.selectDelivery;
-        currentView = 'entregar_paquete';
-        logAudit({ modulo: 'entrega', accion: 'busqueda_sensible', entidad: 'paquetes', entidad_id: selectedDeliveryPackage });
-        render();
-      }));
+      const rows = await api(`/api/ops/paquetes/search?phone=${encodeURIComponent(inputPhone.value.replace(/\D/g, ''))}`).then((r) => r.data || []);
+      renderCards(rows);
     } catch (error) {
       result.innerHTML = `<p class="hint error">${error.message}</p>`;
     }
   };
 
-  input.addEventListener('input', renderResults);
-  renderResults();
+  // Búsqueda por código/guía (pistola). Si encuentra UN paquete DISPONIBLE,
+  // navega automáticamente a "Entregar paquete" y enfoca la cédula.
+  const searchByCode = async (raw) => {
+    const code = (raw || '').trim();
+    if (!code) return;
+    try {
+      const rows = await api(`/api/ops/paquetes/search?code=${encodeURIComponent(code)}`).then((r) => r.data || []);
+      if (rows.length === 0) {
+        if (codeFb) { codeFb.textContent = `✗ No existe paquete con código ${code}`; codeFb.className = 'hint error'; }
+        renderCards([]);
+        return;
+      }
+      const p = rows[0];
+      if (p.estado === 'DISPONIBLE') {
+        if (codeFb) { codeFb.textContent = `✓ ${p.guia} disponible — abriendo entrega…`; codeFb.className = 'hint success'; }
+        goToDeliver(p.id);
+        return;
+      }
+      // Existe pero no está disponible: mostrar el motivo claro
+      const motivo = p.estado === 'PENDIENTE' ? 'aún no ha salido de origen'
+                  : p.estado === 'EN_TRANSITO' ? 'aún en tránsito, no ha llegado a destino'
+                  : p.estado === 'ENTREGADO' ? 'ya fue entregado'
+                  : `estado: ${p.estado}`;
+      if (codeFb) { codeFb.textContent = `⚠ ${p.guia} — ${motivo}`; codeFb.className = 'hint error'; }
+      renderCards(rows);
+    } catch (error) {
+      if (codeFb) { codeFb.textContent = `✗ ${error.message}`; codeFb.className = 'hint error'; }
+    }
+  };
+
+  if (inputCode) {
+    // Pistola: dispara texto + Enter — procesamos al instante con Enter.
+    inputCode.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        searchByCode(inputCode.value);
+        inputCode.value = '';
+      }
+    });
+    // Fallback si la pistola no envía Enter
+    inputCode.addEventListener('input', () => {
+      clearTimeout(scanTimer);
+      scanTimer = setTimeout(() => {
+        if (inputCode.value.trim().length > 4) {
+          searchByCode(inputCode.value);
+          inputCode.value = '';
+        }
+      }, 350);
+    });
+    inputCode.focus();
+  }
+
+  if (inputPhone) {
+    inputPhone.addEventListener('input', searchByPhone);
+  }
 }
 
 // ─── ENTREGA ──────────────────────────────────────────────────────────────────
@@ -1108,6 +1172,19 @@ function wireEntrega() {
     if (preview && p) {
       preview.innerHTML = `<b>Paquete seleccionado:</b> ${p.guia} | ${p.cliente_nombre || c?.nombre || '-'} | Estado: ${p.estado}`;
     }
+    // Auto-focus en cédula para que el operador escriba sin tocar el mouse
+    if (cedula) setTimeout(() => cedula.focus(), 100);
+  }
+
+  // Saltar de cédula a escaneo final con Enter
+  if (cedula && scan) {
+    cedula.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); scan.focus(); }
+    });
+    // Pistola sobre el campo de escaneo dispara confirmación con Enter
+    scan.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); btn?.click(); }
+    });
   }
 
   btn.addEventListener('click', () => {

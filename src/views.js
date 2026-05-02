@@ -958,8 +958,15 @@ function panelEscaneo(mode) {
 function panelBuscar() {
   return `<section class="panel">
     <header class="panel-header"><h3>Buscar paquete</h3></header>
+    <div class="scan-zone scan-zone-big" style="margin-bottom:1rem">
+      <div class="scan-icon">📡</div>
+      <h2>Escanear código de barras o guía</h2>
+      <p class="scan-help">Apunte la pistola y dispare. Si el paquete está disponible, irá automáticamente a <b>Entregar paquete</b>.</p>
+      <input id="buscarCodigo" placeholder="GUIA-000000001 o ASTRAPU-000000001" autofocus />
+      <div id="buscarCodigoFeedback" class="hint"></div>
+    </div>
     <div class="filters-bar">
-      <input id="buscarTelefono" placeholder="Teléfono del destinatario (ej: 8095550000)" />
+      <input id="buscarTelefono" placeholder="O buscar por teléfono del destinatario (ej: 8095550000)" />
     </div>
     <div id="resultadoBusqueda" class="result-cards"></div>
   </section>`;
