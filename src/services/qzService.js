@@ -424,11 +424,14 @@ async function rawPrint(printerName, payload) {
     //      1B 64 06   = ESC d 6   → avanza 6 líneas
     //      1D 56 42 00 = GS V B 0 → corte parcial (Function B, el más compatible)
     //      1D 56 00   = GS V 0    → corte total (algunas térmicas viejas solo lo aceptan así)
+    // Para `type: 'raw'` los formatos válidos en QZ son COMMAND, HEX, BASE64,
+    // IMAGE, PDF, XML, FILE — NO existe PLAIN. Usamos 'command' para texto
+    // ESC/POS y 'hex' para los bytes de corte.
     await window.qz.print(config, [
-      { type: 'raw', format: 'plain', flavor: 'plain', data: payload },
-      { type: 'raw', format: 'hex',   data: '1B6406' },
-      { type: 'raw', format: 'hex',   data: '1D564200' },
-      { type: 'raw', format: 'hex',   data: '1D5600' },
+      { type: 'raw', format: 'command', data: payload },
+      { type: 'raw', format: 'hex',     data: '1B6406' },
+      { type: 'raw', format: 'hex',     data: '1D564200' },
+      { type: 'raw', format: 'hex',     data: '1D5600' },
     ]);
     return { ok: true };
   } catch (error) {
