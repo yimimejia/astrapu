@@ -821,13 +821,25 @@ function panelNuevoEnvio(readOnly) {
     <section class="panel">
       <header class="panel-header"><h3>Registro de envío</h3></header>
       <form id="formEnvio" class="form-grid">
-        <label>Teléfono del cliente<input name="telefono" required placeholder="8095550000" /></label>
-        <label>Nombre del cliente<input name="nombre" required /></label>
+        <h4 class="full" style="margin:0;color:var(--brand-700)">Quien envía (remitente)</h4>
+        <label>Teléfono del remitente<input name="telefono" required placeholder="8095550000" /></label>
+        <label>Nombre del remitente<input name="nombre" required /></label>
         <label>Cédula<input name="cedula" placeholder="Opcional" /></label>
         <label>Dirección<input name="direccion" placeholder="Opcional" /></label>
+        <div id="autocompleteCliente" class="hint full">Escriba teléfono para autocompletar remitente.</div>
+
+        <h4 class="full" style="margin:.6rem 0 0;color:var(--brand-700)">Para: (destinatario)</h4>
+        <label>Teléfono de quien recibe<input name="destinatario_telefono" placeholder="8095551234" /></label>
+        <label>Nombre de quien recibe<input name="destinatario_nombre" placeholder="Opcional" /></label>
+        <label>Cédula del destinatario<input name="destinatario_cedula" placeholder="Opcional" /></label>
+        <label>Dirección del destinatario<input name="destinatario_direccion" placeholder="Opcional" /></label>
+        <div id="autocompleteDestinatario" class="hint full">Escriba el teléfono del destinatario para autocompletar.</div>
+
+        <h4 class="full" style="margin:.6rem 0 0;color:var(--brand-700)">Detalles del envío</h4>
         <label>Descripción del artículo<input name="descripcion" required /></label>
         <label>Color del empaque<input name="color_empaque" required /></label>
-        <label>Monto a cobrar<input name="monto" type="number" min="0" step="0.01" required /></label>
+        <label>Cantidad de bultos / cajas<input name="bultos" type="number" min="1" max="50" step="1" value="1" required /></label>
+        <label>Monto a cobrar (total)<input name="monto" type="number" min="0" step="0.01" required /></label>
         <label>Método de pago
           <select name="metodo_pago">
             <option value="EFECTIVO">Efectivo</option>
@@ -843,7 +855,6 @@ function panelNuevoEnvio(readOnly) {
           <button ${readOnly ? 'disabled' : ''} class="btn" type="button" data-action="reimprimir-ultimo">Reimprimir último</button>
         </div>
       </form>
-      <div id="autocompleteCliente" class="hint">Escriba teléfono para autocompletar cliente.</div>
       <div id="previewEnvio" class="preview"></div>
     </section>`;
 }
@@ -971,13 +982,13 @@ function panelBuscar() {
 
   return `<section class="panel">
     <header class="panel-header">
-      <h3>Buscar paquete</h3>
+      <h3>Paquetes disponibles</h3>
       <span class="scan-counter-pill">${disponibles.length} disponible${disponibles.length === 1 ? '' : 's'}</span>
     </header>
     <div class="scan-zone scan-zone-big" style="margin-bottom:1rem">
       <div class="scan-icon">🔎</div>
       <h2>Consultar paquete</h2>
-      <p class="scan-help">Escanee la pistola o teclee el código para ver la información. <b>Esta vista es de solo consulta.</b></p>
+      <p class="scan-help">Escanee la pistola o teclee el código (paquete o factura) para ver la información. <b>Esta vista es de solo consulta.</b></p>
       <input id="buscarCodigo" placeholder="GUIA-000000001 o ASTRAPU-000000001" autofocus />
       <div id="buscarCodigoFeedback" class="hint"></div>
       <div id="paqueteInfoCard"></div>

@@ -80,6 +80,19 @@ export async function migrate() {
     }
   }
 
+  // 005 — multi-bulto support: paquetes pertenecientes a un mismo envío comparten grupo_id
+  const alterStatements005 = [
+    `ALTER TABLE paquetes ADD COLUMN grupo_id TEXT`,
+    `ALTER TABLE paquetes ADD COLUMN bulto_index INTEGER NOT NULL DEFAULT 1`,
+    `ALTER TABLE paquetes ADD COLUMN bulto_total INTEGER NOT NULL DEFAULT 1`,
+  ];
+  for (const stmt of alterStatements005) {
+    try { await run(stmt); } catch (e) {
+      if (!String(e.message).includes('duplicate column')) throw e;
+    }
+  }
+  try { await run(`CREATE INDEX IF NOT EXISTS idx_paquetes_grupo ON paquetes(grupo_id)`); } catch (_) {}
+
   await run(
     `INSERT OR IGNORE INTO usuarios(id, username, nombre, password_hash, rol, sucursal_id)
      VALUES('u-admin','admin','Administrador General', ?, 'admin','suc-1')`,

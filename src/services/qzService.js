@@ -262,8 +262,24 @@ function escposTicket(data) {
     rAlign('Devuelta:', 'RD$ 0.00'),
     `${EQ}\n`,
 
-    // ── FOOTER ──
+    // ── BARCODE (Code 128) — para que la factura sea escaneable con la pistola ──
+    // GS h n  : altura en dots (80 ≈ 10 mm)
+    // GS w n  : ancho de módulo (2)
+    // GS H n  : posición HRI (2 = debajo del barcode)
+    // GS f n  : fuente HRI (0 = font A normal)
+    // GS k 73 n d1..dn : Code 128 con prefijo de longitud. Datos comienzan con `{B`
+    //                   para activar Code Set B (ASCII imprimible).
     CTR,
+    (() => {
+      const code = String(data.codigo_barras || data.guia || '').slice(0, 80);
+      if (!code) return '';
+      const cb = `{B${code}`;
+      const len = String.fromCharCode(cb.length);
+      return '\x1D\x68\x50' + '\x1D\x77\x02' + '\x1D\x48\x02' + '\x1D\x66\x00'
+           + '\x1D\x6B\x49' + len + cb + '\n';
+    })(),
+
+    // ── FOOTER ──
     `\n${msgFinal}\n`,
     NORMAL,
     '\n\n',

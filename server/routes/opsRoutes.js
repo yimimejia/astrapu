@@ -43,32 +43,71 @@ opsRoutes.post('/envios', opsMutationLimiter, forbidReadOnlyMutations, validateB
     key: idempotencyKey,
     work: async () => withTransaction(async () => {
       const payload = req.body;
-      const client = await findOrCreateClient(payload);
-      const guia = await nextGuia();
-      const paqueteId = `p-${crypto.randomUUID()}`;
+      const sender = await findOrCreateClient(payload);
+
+      // Destinatario opcional: si viene su teléfono, crear/buscar su ficha de cliente
+      let receiver = null;
+      if (payload.destinatario_telefono && payload.destinatario_telefono.replace(/\D/g, '').length >= 7) {
+        receiver = await findOrCreateClient({
+          telefono: payload.destinatario_telefono,
+          nombre: payload.destinatario_nombre || 'Destinatario',
+          cedula: payload.destinatario_cedula || '',
+          direccion: payload.destinatario_direccion || '',
+        });
+      }
+      const telDestinatario = receiver?.telefono || sender.telefono;
+
+      const bultos = Math.max(1, Number(payload.bultos) || 1);
+      const totalMonto = Number(payload.monto);
+      const baseMonto = Math.round((totalMonto / bultos) * 100) / 100;
+      const remainder = +(totalMonto - baseMonto * bultos).toFixed(2);
+
+      const grupoId = bultos > 1 ? `grp-${crypto.randomUUID()}` : null;
       const now = new Date().toISOString();
+      const paquetes = [];
 
-      await run(
-        `INSERT INTO paquetes(id, guia, codigo_barras, cliente_id, telefono_destinatario, descripcion, color_empaque, monto, sucursal_origen, sucursal_destino, estado, created_by, created_at)
-         VALUES(?,?,?,?,?,?,?,?,?,?, 'PENDIENTE', ?, ?)`,
-        [paqueteId, guia, `ASTRAPU-${guia.split('-')[1]}`, client.id, client.telefono, payload.descripcion, payload.color_empaque, Number(payload.monto), payload.sucursal_origen, payload.sucursal_destino, req.user.id, now],
-      );
+      for (let i = 1; i <= bultos; i++) {
+        const guia = await nextGuia();
+        const paqueteId = `p-${crypto.randomUUID()}`;
+        const codigoBarras = `ASTRAPU-${guia.split('-')[1]}`;
+        const monto_i = i === 1 ? +(baseMonto + remainder).toFixed(2) : baseMonto;
 
+        await run(
+          `INSERT INTO paquetes(id, guia, codigo_barras, cliente_id, telefono_destinatario, descripcion, color_empaque, monto, sucursal_origen, sucursal_destino, estado, created_by, created_at, grupo_id, bulto_index, bulto_total)
+           VALUES(?,?,?,?,?,?,?,?,?,?, 'PENDIENTE', ?, ?, ?, ?, ?)`,
+          [paqueteId, guia, codigoBarras, sender.id, telDestinatario, payload.descripcion, payload.color_empaque, monto_i, payload.sucursal_origen, payload.sucursal_destino, req.user.id, now, grupoId, i, bultos],
+        );
+
+        await run(
+          `INSERT INTO movimientos_paquete(id, paquete_id, estado_origen, estado_destino, usuario_id, sucursal_id, detalle, created_at)
+           VALUES(?,?,?,?,?,?,?,?)`,
+          [crypto.randomUUID(), paqueteId, null, 'PENDIENTE', req.user.id, req.user.sucursal_id, `Registro de envío (${i}/${bultos})`, now],
+        );
+
+        paquetes.push({ id: paqueteId, paquete_id: paqueteId, guia, codigo_barras: codigoBarras, bulto_index: i, bulto_total: bultos });
+      }
+
+      // Una sola venta por envío (referencia el primer paquete y registra el monto total)
+      const primary = paquetes[0];
       const ventaId = `v-${crypto.randomUUID()}`;
       await run(
         `INSERT INTO ventas(id, paquete_id, guia, cliente_id, monto, metodo_pago, usuario_id, sucursal_id, created_at)
          VALUES(?,?,?,?,?,?,?, ?, ?)`,
-        [ventaId, paqueteId, guia, client.id, Number(payload.monto), payload.metodo_pago || 'EFECTIVO', req.user.id, req.user.sucursal_id, now],
+        [ventaId, primary.id, primary.guia, sender.id, totalMonto, payload.metodo_pago || 'EFECTIVO', req.user.id, req.user.sucursal_id, now],
       );
 
-      await run(
-        `INSERT INTO movimientos_paquete(id, paquete_id, estado_origen, estado_destino, usuario_id, sucursal_id, detalle, created_at)
-         VALUES(?,?,?,?,?,?,?,?)`,
-        [crypto.randomUUID(), paqueteId, null, 'PENDIENTE', req.user.id, req.user.sucursal_id, 'Registro de envío', now],
-      );
+      await writeAudit({ req, modulo: 'envios', accion: 'registro_envio', entidad: 'paquetes', entidadId: primary.id, valorNuevo: { guia: primary.guia, ventaId, bultos, grupoId } });
 
-      await writeAudit({ req, modulo: 'envios', accion: 'registro_envio', entidad: 'paquetes', entidadId: paqueteId, valorNuevo: { guia, ventaId } });
-      return { paquete_id: paqueteId, venta_id: ventaId, guia };
+      return {
+        // Compatibilidad con consumidores antiguos (un paquete)
+        paquete_id: primary.id,
+        guia: primary.guia,
+        venta_id: ventaId,
+        // Nuevos campos para multi-bulto
+        grupo_id: grupoId,
+        bultos,
+        paquetes,
+      };
     }),
   });
 
@@ -145,13 +184,25 @@ opsRoutes.get('/paquetes/search', opsSearchLimiter, async (req, res) => {
       [code, code],
     );
   } else if (cedula) {
-    rows = await all(
-      `SELECT p.*, c.nombre as cliente_nombre, c.cedula
-       FROM paquetes p JOIN clientes c ON c.id = p.cliente_id
-       WHERE c.cedula = ? ${onlyAvailable ? "AND p.estado = 'DISPONIBLE'" : ''}
-       ORDER BY p.created_at DESC LIMIT 50`,
-      [cedula],
-    );
+    // Buscar paquetes donde la cédula coincida con el REMITENTE (cliente_id)
+    // o con el DESTINATARIO (clientes con esa cédula cuyo teléfono == telefono_destinatario).
+    const matchingClients = await all('SELECT id, telefono FROM clientes WHERE cedula = ?', [cedula]);
+    const ids = matchingClients.map((c) => c.id);
+    const tels = matchingClients.map((c) => c.telefono).filter(Boolean);
+    if (ids.length === 0) {
+      rows = [];
+    } else {
+      const idPh = ids.map(() => '?').join(',');
+      const telPh = tels.length ? tels.map(() => '?').join(',') : "''";
+      rows = await all(
+        `SELECT p.*, c.nombre as cliente_nombre, c.cedula
+         FROM paquetes p JOIN clientes c ON c.id = p.cliente_id
+         WHERE (p.cliente_id IN (${idPh})${tels.length ? ` OR p.telefono_destinatario IN (${telPh})` : ''})
+         ${onlyAvailable ? "AND p.estado = 'DISPONIBLE'" : ''}
+         ORDER BY p.created_at DESC LIMIT 50`,
+        [...ids, ...tels],
+      );
+    }
   } else {
     rows = await all(
       `SELECT p.*, c.nombre as cliente_nombre, c.cedula
@@ -165,14 +216,23 @@ opsRoutes.get('/paquetes/search', opsSearchLimiter, async (req, res) => {
   res.json({ ok: true, data: rows });
 });
 
-opsRoutes.post('/paquetes/delivery/session', opsMutationLimiter, forbidReadOnlyMutations, validateBody(startDeliverySchema), async (req, res) => {
+opsRoutes.post('/paquetes/delivery/session', opsMutationLimiter, forbidReadOnlyMutations, requireRole('admin', 'entrega'), validateBody(startDeliverySchema), async (req, res) => {
   const { paquete_id, cedula } = req.body;
   const paquete = await get('SELECT p.*, c.cedula as cedula_cliente FROM paquetes p JOIN clientes c ON c.id = p.cliente_id WHERE p.id = ?', [paquete_id]);
   if (!paquete) return sendError(res, 404, 'NOT_FOUND', 'Paquete no encontrado');
   if (paquete.estado !== 'DISPONIBLE') return sendError(res, 400, 'INVALID_STATE', 'Paquete no disponible para entrega');
 
-  if ((paquete.cedula_cliente || '') !== cedula) {
-    await run('INSERT INTO failed_delivery_attempts(id, paquete_id, usuario_id, sucursal_id, motivo, expected_value, provided_value) VALUES(?,?,?,?,?,?,?)', [crypto.randomUUID(), paquete.id, req.user.id, req.user.sucursal_id, 'cedula_incorrecta', paquete.cedula_cliente || '', cedula || '']);
+  // Sucursal de destino: admin opera cualquiera, otros solo su sucursal asignada
+  if (req.user.rol !== 'admin' && paquete.sucursal_destino && req.user.sucursal_id !== paquete.sucursal_destino) {
+    return sendError(res, 403, 'FORBIDDEN', 'Paquete no pertenece a tu sucursal de destino');
+  }
+
+  // La cédula puede ser del REMITENTE o del DESTINATARIO (cliente con cédula = X cuyo teléfono == telefono_destinatario)
+  const cedulaSender = paquete.cedula_cliente || '';
+  const receiver = await get('SELECT cedula FROM clientes WHERE telefono = ?', [paquete.telefono_destinatario]);
+  const cedulaReceiver = receiver?.cedula || '';
+  if (cedula !== cedulaSender && cedula !== cedulaReceiver) {
+    await run('INSERT INTO failed_delivery_attempts(id, paquete_id, usuario_id, sucursal_id, motivo, expected_value, provided_value) VALUES(?,?,?,?,?,?,?)', [crypto.randomUUID(), paquete.id, req.user.id, req.user.sucursal_id, 'cedula_incorrecta', `${cedulaSender}|${cedulaReceiver}`, cedula || '']);
     await writeAudit({ req, modulo: 'entrega', accion: 'cedula_incorrecta_entrega', entidad: 'paquetes', entidadId: paquete.id, resultado: 'ERROR' });
     return sendError(res, 400, 'CEDULA_MISMATCH', 'Cédula no coincide');
   }
@@ -183,7 +243,7 @@ opsRoutes.post('/paquetes/delivery/session', opsMutationLimiter, forbidReadOnlyM
   res.json({ ok: true, data: { session_id: sessionId, estado: 'ESPERANDO_ESCANEO_FINAL' } });
 });
 
-opsRoutes.post('/paquetes/delivery/confirm', opsMutationLimiter, forbidReadOnlyMutations, validateBody(confirmDeliverySchema), async (req, res) => {
+opsRoutes.post('/paquetes/delivery/confirm', opsMutationLimiter, forbidReadOnlyMutations, requireRole('admin', 'entrega'), validateBody(confirmDeliverySchema), async (req, res) => {
   const { session_id, scanned_code } = req.body;
 
   const result = await withTransaction(async () => {
@@ -192,6 +252,11 @@ opsRoutes.post('/paquetes/delivery/confirm', opsMutationLimiter, forbidReadOnlyM
 
     const paquete = await get('SELECT * FROM paquetes WHERE id = ?', [session.paquete_id]);
     if (!paquete) return { ok: false, error: 'Paquete no encontrado' };
+
+    // Sucursal de destino: admin opera cualquiera, otros solo su sucursal asignada
+    if (req.user.rol !== 'admin' && paquete.sucursal_destino && req.user.sucursal_id !== paquete.sucursal_destino) {
+      return { ok: false, error: 'Paquete no pertenece a tu sucursal de destino' };
+    }
 
     if (scanned_code !== paquete.guia && scanned_code !== paquete.codigo_barras) {
       await run('INSERT INTO failed_delivery_attempts(id, paquete_id, usuario_id, sucursal_id, motivo, expected_value, provided_value) VALUES(?,?,?,?,?,?,?)', [crypto.randomUUID(), paquete.id, req.user.id, req.user.sucursal_id, 'escaneo_final_incorrecto', `${paquete.guia}/${paquete.codigo_barras}`, scanned_code]);

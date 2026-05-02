@@ -753,9 +753,25 @@ function wireEnvioForm() {
       form.nombre.value = c.nombre;
       form.cedula.value = c.cedula || '';
       form.direccion.value = c.direccion || '';
-      if (auto) auto.textContent = `✓ Cliente encontrado: ${c.nombre} (${c.telefono})`;
+      if (auto) auto.textContent = `✓ Remitente encontrado: ${c.nombre} (${c.telefono})`;
     } else {
-      if (auto) auto.textContent = 'Cliente no encontrado. Se registrará automáticamente al enviar.';
+      if (auto) auto.textContent = 'Remitente no encontrado. Se registrará automáticamente al enviar.';
+    }
+  });
+
+  // Autocompletar destinatario por teléfono
+  const telDest = form.querySelector('[name="destinatario_telefono"]');
+  const autoDest = document.getElementById('autocompleteDestinatario');
+  telDest?.addEventListener('input', () => {
+    const tel = telDest.value.replace(/\D/g, '');
+    const c = db.clientes.find((x) => x.telefono === tel);
+    if (c) {
+      form.destinatario_nombre.value = c.nombre;
+      form.destinatario_cedula.value = c.cedula || '';
+      form.destinatario_direccion.value = c.direccion || '';
+      if (autoDest) autoDest.textContent = `✓ Destinatario encontrado: ${c.nombre} (${c.telefono})`;
+    } else {
+      if (autoDest) autoDest.textContent = 'Destinatario nuevo — se registrará al enviar.';
     }
   });
 
@@ -781,12 +797,22 @@ function wireEnvioForm() {
       const pkg = result.data;
       const _dest = db.sucursales.find((s) => s.id === payload.sucursal_destino)?.nombre || '-';
       const _orig = db.sucursales.find((s) => s.id === getCurrentUser().sucursal_id)?.nombre || '-';
-      const printResult = await printSaleDocuments(
+
+      // Si vienen múltiples paquetes (multi-bulto), imprimir 1 ticket (con todas las guías)
+      // y N etiquetas, una por bulto.
+      const paquetes = pkg.paquetes && pkg.paquetes.length ? pkg.paquetes
+        : [{ guia: pkg.guia, codigo_barras: `ASTRAPU-${pkg.guia.split('-')[1]}`, bulto_index: 1, bulto_total: 1 }];
+
+      // 1 ticket por envío (factura). Incluye lista de guías si son varias.
+      const ticketGuiaLine = paquetes.length === 1 ? paquetes[0].guia : `${paquetes[0].guia}  (+${paquetes.length - 1} más)`;
+      const ticketPrint = await printSaleDocuments(
         {
-          guia: pkg.guia,
+          guia: paquetes[0].guia,
           cliente: payload.nombre,
           telefono_cliente: payload.telefono || '',
-          descripcion: payload.descripcion || '',
+          destinatario: payload.destinatario_nombre || '',
+          telefono_destinatario: payload.destinatario_telefono || '',
+          descripcion: `${payload.descripcion || ''}${paquetes.length > 1 ? ` — ${paquetes.length} bultos` : ''}`,
           color: payload.color_empaque || '',
           monto: Number(payload.monto).toFixed(2),
           metodo_pago: payload.metodo_pago || 'EFECTIVO',
@@ -794,11 +820,31 @@ function wireEnvioForm() {
           origen: _orig,
           operador: getCurrentUser().username,
           fecha: new Date().toISOString(),
+          bultos: paquetes.length,
+          guias_extras: paquetes.length > 1 ? paquetes.slice(1).map((p) => p.guia) : [],
         },
-        { guia: pkg.guia, destino: _dest, codigo_barras: `ASTRAPU-${pkg.guia.split('-')[1]}` },
+        { guia: paquetes[0].guia, destino: _dest, codigo_barras: paquetes[0].codigo_barras, bulto_index: paquetes[0].bulto_index, bulto_total: paquetes[0].bulto_total },
       );
-      showAlert(`Envío registrado ${pkg.guia}. ${printResult.message}`, printResult.ok ? 'success' : 'info');
-      logAudit({ modulo: 'impresion', accion: 'print_after_envio', entidad: 'paquetes', entidad_id: pkg.paquete_id, resultado: printResult.ok ? 'OK' : 'ERROR', observacion: printResult.message });
+
+      // Etiquetas adhesivas adicionales (a partir del 2º bulto): solo etiqueta, sin reimprimir el ticket.
+      const labelResults = [];
+      for (let i = 1; i < paquetes.length; i++) {
+        const p = paquetes[i];
+        try {
+          const { printAdhesiveLabel } = await import('./services/qzService.js');
+          const r = await printAdhesiveLabel({
+            guia: p.guia, destino: _dest, codigo_barras: p.codigo_barras,
+            bulto_index: p.bulto_index, bulto_total: p.bulto_total,
+          });
+          labelResults.push(r.ok);
+        } catch (_) { labelResults.push(false); }
+      }
+      const allLabelsOk = labelResults.every(Boolean);
+      const summary = paquetes.length > 1
+        ? `Envío registrado ${paquetes[0].guia} con ${paquetes.length} bultos. ${ticketPrint.message}${allLabelsOk ? '' : ' — Algunas etiquetas fallaron.'}`
+        : `Envío registrado ${pkg.guia}. ${ticketPrint.message}`;
+      showAlert(summary, ticketPrint.ok && allLabelsOk ? 'success' : 'info');
+      logAudit({ modulo: 'impresion', accion: 'print_after_envio', entidad: 'paquetes', entidad_id: pkg.paquete_id, resultado: ticketPrint.ok ? 'OK' : 'ERROR', observacion: summary });
       form.reset();
       await render();
     } catch (error) {
@@ -1168,6 +1214,7 @@ function wireEntrega() {
 
   let cedulaActual = '';
   let paquetesDisponibles = [];
+  let entregadosIds = new Set();
   let confirmando = false;
 
   const setStep = (n) => {
@@ -1180,6 +1227,7 @@ function wireEntrega() {
   const goPaso1 = () => {
     cedulaActual = '';
     paquetesDisponibles = [];
+    entregadosIds = new Set();
     if (paso1) paso1.style.display = '';
     if (paso2) paso2.style.display = 'none';
     if (cedula) { cedula.value = ''; setTimeout(() => cedula.focus(), 50); }
@@ -1187,22 +1235,36 @@ function wireEntrega() {
     setStep(1);
   };
 
+  const renderPaquetesList = () => {
+    if (!paquetesBox) return;
+    paquetesBox.innerHTML = paquetesDisponibles.map((p) => {
+      const ya = entregadosIds.has(p.id);
+      const bultoTag = (p.bulto_total && p.bulto_total > 1) ? ` <span class="badge" style="background:#fde68a;color:#854d0e">Caja ${p.bulto_index}/${p.bulto_total}</span>` : '';
+      return `<article class="result-card" style="${ya ? 'opacity:.55;border-left:4px solid #22c55e' : ''}">
+        <h4>${p.guia}${bultoTag}</h4>
+        <p><b>Cliente:</b> ${p.cliente_nombre || '-'}</p>
+        <p><b>Descripción:</b> ${p.descripcion || '-'}</p>
+        <p><b>Destino:</b> ${db.sucursales.find((s) => s.id === p.sucursal_destino)?.nombre || '-'}</p>
+        <span class="badge ${ya ? 'entregado' : 'disponible'}">${ya ? '✓ Escaneado' : 'Pendiente de escaneo'}</span>
+      </article>`;
+    }).join('');
+  };
+
   const goPaso2 = (rows) => {
     paquetesDisponibles = rows;
+    entregadosIds = new Set();
     if (paso1) paso1.style.display = 'none';
     if (paso2) paso2.style.display = '';
-    if (paquetesBox) {
-      paquetesBox.innerHTML = rows.map((p) => `
-        <article class="result-card">
-          <h4>${p.guia}</h4>
-          <p><b>Cliente:</b> ${p.cliente_nombre || '-'}</p>
-          <p><b>Descripción:</b> ${p.descripcion || '-'}</p>
-          <p><b>Destino:</b> ${db.sucursales.find((s) => s.id === p.sucursal_destino)?.nombre || '-'}</p>
-          <span class="badge disponible">Disponible</span>
-        </article>`).join('');
+    renderPaquetesList();
+    if (scanFinal) {
+      scanFinal.value = '';
+      const restantes = rows.length;
+      if (rows.length > 1) {
+        scanFb.textContent = `Hay ${restantes} paquetes para esta cédula — debe escanear todos.`;
+        scanFb.className = 'hint';
+      }
+      setTimeout(() => scanFinal.focus(), 50);
     }
-    if (scanFinal) { scanFinal.value = ''; setTimeout(() => scanFinal.focus(), 50); }
-    if (scanFb) { scanFb.textContent = ''; scanFb.className = 'hint'; }
     setStep(2);
   };
 
@@ -1225,15 +1287,15 @@ function wireEntrega() {
     }
   };
 
-  const mostrarModal = (guia) => {
+  const mostrarModal = (resumen) => {
     if (!modal) return;
-    if (modalDetail) modalDetail.textContent = `Guía ${guia} entregada correctamente.`;
+    if (modalDetail) modalDetail.textContent = resumen;
     modal.style.display = '';
     setStep(3);
     setTimeout(() => {
       if (modal) modal.style.display = 'none';
       goPaso1();
-      render(); // refresca lista de "Buscar paquete" en el sidebar
+      render(); // refresca lista de "Paquetes disponibles" en el sidebar
     }, 5000);
   };
 
@@ -1241,12 +1303,16 @@ function wireEntrega() {
     if (confirmando) return;
     const code = (raw || '').trim();
     if (!code) return;
-    // Buscar el paquete escaneado dentro de los disponibles para esta cédula
     const match = paquetesDisponibles.find((p) => p.guia === code || p.codigo_barras === code);
     if (!match) {
       beep(false); flashScan(false);
       if (scanFb) { scanFb.textContent = `✗ El código ${code} no corresponde a un paquete de esta cédula`; scanFb.className = 'hint error'; }
       if (scanFinal) scanFinal.value = '';
+      return;
+    }
+    if (entregadosIds.has(match.id)) {
+      beep(false); flashScan(false);
+      if (scanFb) { scanFb.textContent = `⚠ ${match.guia} ya fue escaneado en esta sesión`; scanFb.className = 'hint error'; }
       return;
     }
     confirmando = true;
@@ -1261,8 +1327,21 @@ function wireEntrega() {
       });
       if (finalRes.ok) {
         beep(true); flashScan(true);
-        await syncDataFromBackend();
-        mostrarModal(match.guia);
+        entregadosIds.add(match.id);
+        renderPaquetesList();
+        const restantes = paquetesDisponibles.length - entregadosIds.size;
+        if (restantes === 0) {
+          await syncDataFromBackend();
+          const total = paquetesDisponibles.length;
+          mostrarModal(total === 1
+            ? `Guía ${match.guia} entregada correctamente.`
+            : `${total} paquetes entregados correctamente.`);
+        } else {
+          if (scanFb) {
+            scanFb.textContent = `✓ ${match.guia} escaneado. Faltan ${restantes} paquete${restantes === 1 ? '' : 's'} por escanear.`;
+            scanFb.className = 'hint success';
+          }
+        }
       } else {
         beep(false); flashScan(false);
         if (scanFb) { scanFb.textContent = `✗ ${finalRes.error}`; scanFb.className = 'hint error'; }
