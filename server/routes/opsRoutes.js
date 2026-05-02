@@ -66,10 +66,17 @@ opsRoutes.post('/envios', opsMutationLimiter, forbidReadOnlyMutations, validateB
       const now = new Date().toISOString();
       const paquetes = [];
 
+      // Una sola guía base para todo el envío. Los bultos adicionales reusan ese número
+      // con sufijo -1, -2, -3… tanto en la guía como en el código de barras, de modo que
+      // el operador deba escanear códigos DIFERENTES por bulto (no puede repetir el mismo).
+      const guiaBase = await nextGuia();                 // ej. GUIA-000000006
+      const numero   = guiaBase.split('-')[1];           // ej. 000000006
+
       for (let i = 1; i <= bultos; i++) {
-        const guia = await nextGuia();
+        const sufijo = i === 1 ? '' : `-${i - 1}`;
+        const guia = `${guiaBase}${sufijo}`;             // GUIA-000000006, GUIA-000000006-1, …
+        const codigoBarras = `ASTRAPU-${numero}${sufijo}`; // ASTRAPU-000000006, ASTRAPU-000000006-1, …
         const paqueteId = `p-${crypto.randomUUID()}`;
-        const codigoBarras = `ASTRAPU-${guia.split('-')[1]}`;
         const monto_i = i === 1 ? +(baseMonto + remainder).toFixed(2) : baseMonto;
 
         await run(
