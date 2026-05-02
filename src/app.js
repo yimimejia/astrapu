@@ -834,11 +834,73 @@ function wireEnvioForm() {
 
 // ─── ESCANEO ──────────────────────────────────────────────────────────────────
 
+let scanCounter = 0;
+let scanBusy = false;
+let audioCtx = null;
+function getAudio() {
+  if (audioCtx) return audioCtx;
+  try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (_) { audioCtx = null; }
+  return audioCtx;
+}
+function beep(ok) {
+  const ctx = getAudio();
+  if (!ctx) return;
+  try {
+    if (ctx.state === 'suspended') ctx.resume();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    if (ok) {
+      osc.frequency.value = 1500;
+      gain.gain.setValueAtTime(0.001, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.35, ctx.currentTime + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.18);
+      osc.start(); osc.stop(ctx.currentTime + 0.2);
+    } else {
+      osc.frequency.value = 220;
+      gain.gain.setValueAtTime(0.001, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.4, ctx.currentTime + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.45);
+      osc.start(); osc.stop(ctx.currentTime + 0.5);
+    }
+  } catch (_) {}
+  if (navigator.vibrate) {
+    try { navigator.vibrate(ok ? 60 : [120, 60, 120]); } catch (_) {}
+  }
+}
+function flashScan(ok) {
+  const flash = document.getElementById('scanFlash');
+  if (!flash) return;
+  flash.className = `scan-flash ${ok ? 'ok' : 'err'} show`;
+  setTimeout(() => { if (flash) flash.className = 'scan-flash'; }, 350);
+}
+function updateScanLast(ok, guia, detail) {
+  const last = document.getElementById('scanLast');
+  const st   = document.getElementById('scanLastStatus');
+  const g    = document.getElementById('scanLastGuia');
+  const d    = document.getElementById('scanLastDetail');
+  if (last) last.style.display = '';
+  if (st) {
+    st.textContent = ok ? '✓ OK' : '✗ ERROR';
+    st.className = `scan-last-status ${ok ? 'ok' : 'err'}`;
+  }
+  if (g) g.textContent = guia || '—';
+  if (d) d.textContent = detail || '';
+  if (ok) {
+    scanCounter++;
+    const pill = document.getElementById('scanCounterPill');
+    if (pill) pill.textContent = `${scanCounter} escaneado${scanCounter === 1 ? '' : 's'}`;
+  }
+}
+
 function wireScanning() {
   const input = document.getElementById('scanInput');
-  const feedback = document.getElementById('scanFeedback');
   const tableEl = document.getElementById('scanTable');
   if (!input) return;
+
+  scanCounter = 0;
+  const pill = document.getElementById('scanCounterPill');
+  if (pill) pill.textContent = '0 escaneados';
 
   const refreshTable = () => {
     const rows = db.movimientos_paquete.slice(0, 10).map((m) => {
@@ -848,54 +910,77 @@ function wireScanning() {
     if (tableEl) tableEl.innerHTML = `<table><thead><tr><th>Hora</th><th>Guía</th><th>Estado</th><th>Detalle</th></tr></thead><tbody>${rows}</tbody></table>`;
   };
 
-  const process = (raw) => {
-    const code = raw.trim();
-    if (!code) return;
-    const mode = input.dataset.mode;
-    const endpoint = mode === 'enviar' ? '/api/ops/paquetes/scan-send' : '/api/ops/paquetes/scan-receive';
-    api(endpoint, {
-      method: 'POST',
-      headers: { 'x-idempotency-key': crypto.randomUUID() },
-      body: { code },
-    }).then(async (result) => {
-      if (result.ok) {
-        if (mode === 'enviar') {
-          await render();
-        } else {
-          await syncDataFromBackend();
-          refreshTable();
-          const inputEl = document.getElementById('scanInput');
-          if (inputEl) { inputEl.value = ''; inputEl.focus(); }
-          const feedbackEl = document.getElementById('scanFeedback');
-          if (feedbackEl) {
-            feedbackEl.textContent = '✓ Paquete recibido';
-            feedbackEl.className = 'hint success';
-            setTimeout(() => { if (feedbackEl) { feedbackEl.textContent = ''; feedbackEl.className = 'hint'; } }, 1800);
-          }
-        }
-      } else {
-        const feedbackEl = document.getElementById('scanFeedback');
-        if (feedbackEl) { feedbackEl.textContent = result.error; feedbackEl.className = 'hint error'; }
-        const inputEl = document.getElementById('scanInput');
-        if (inputEl) { inputEl.value = ''; inputEl.focus(); }
-      }
-    }).catch((error) => {
-      const feedbackEl = document.getElementById('scanFeedback');
-      if (feedbackEl) { feedbackEl.textContent = error.message; feedbackEl.className = 'hint error'; }
-      const inputEl = document.getElementById('scanInput');
-      if (inputEl) { inputEl.value = ''; inputEl.focus(); }
-    });
+  const refocus = () => {
+    const el = document.getElementById('scanInput');
+    if (el) { el.value = ''; el.focus(); }
   };
 
+  const process = async (raw) => {
+    const code = raw.trim();
+    if (!code) return;
+    if (scanBusy) return;
+    scanBusy = true;
+    const mode = input.dataset.mode;
+    const endpoint = mode === 'enviar' ? '/api/ops/paquetes/scan-send' : '/api/ops/paquetes/scan-receive';
+    try {
+      const result = await api(endpoint, {
+        method: 'POST',
+        headers: { 'x-idempotency-key': crypto.randomUUID() },
+        body: { code },
+      });
+      if (result.ok) {
+        beep(true); flashScan(true);
+        const guia = result.data?.guia || code;
+        const detail = mode === 'enviar' ? 'Despachado — EN TRÁNSITO' : 'Recibido en sucursal';
+        updateScanLast(true, guia, detail);
+        await syncDataFromBackend();
+        refreshTable();
+        const fb = document.getElementById('scanFeedback');
+        if (fb) { fb.textContent = `✓ ${detail} — ${guia}`; fb.className = 'hint success'; }
+      } else {
+        beep(false); flashScan(false);
+        updateScanLast(false, code, result.error || 'Error');
+        const fb = document.getElementById('scanFeedback');
+        if (fb) { fb.textContent = `✗ ${result.error}`; fb.className = 'hint error'; }
+      }
+    } catch (error) {
+      beep(false); flashScan(false);
+      updateScanLast(false, code, error.message || 'Error de red');
+      const fb = document.getElementById('scanFeedback');
+      if (fb) { fb.textContent = `✗ ${error.message}`; fb.className = 'hint error'; }
+    } finally {
+      scanBusy = false;
+      refocus();
+    }
+  };
+
+  // Captura por teclado: las pistolas envían texto rápido + Enter.
+  // Procesamos con Enter (instantáneo) y como fallback con timeout en `input`.
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      clearTimeout(scanTimer);
+      const v = input.value;
+      process(v);
+    }
+  });
   input.addEventListener('input', () => {
     clearTimeout(scanTimer);
-    scanTimer = setTimeout(() => process(input.value), 120);
+    scanTimer = setTimeout(() => {
+      if (input.value.trim().length > 2) process(input.value);
+    }, 250);
+  });
+  input.addEventListener('blur', () => {
+    setTimeout(() => {
+      const cur = document.getElementById('scanInput');
+      if (cur && document.activeElement !== cur) cur.focus();
+    }, 50);
   });
 
   refs.content.querySelectorAll('[data-action="scan-guia"]').forEach((btn) => {
     btn.addEventListener('click', () => {
       const guia = btn.dataset.guia;
-      if (guia) { input.value = guia; process(guia); }
+      if (guia) { process(guia); }
     });
   });
 
@@ -1359,23 +1444,30 @@ async function wireInteligencia() {
   await renderAll();
 }
 
-// ─── CAPTURA GLOBAL DE ESCÁNER (Entregar paquete) ────────────────────────────
-// Los lectores de código de barras simulan pulsaciones de teclado rápidas + Enter.
-// Si #scanEntrega está en el DOM y el foco NO está en otro input, capturamos
-// el escaneo y lo redirigimos automáticamente al campo de escaneo final.
+// ─── CAPTURA GLOBAL DE ESCÁNER ────────────────────────────────────────────────
+// Las pistolas lectoras simulan pulsaciones de teclado rápidas + Enter.
+// Capturamos el escaneo aunque no haya foco y lo redirigimos al campo activo:
+//   - #scanInput  → vista enviar/recibir paquetes (procesa al instante)
+//   - #scanEntrega → vista entregar paquete
 
 (function setupGlobalScanCapture() {
   let buf = '';
   let timer = null;
 
   document.addEventListener('keydown', (e) => {
-    const scanField = document.getElementById('scanEntrega');
+    const scanInput   = document.getElementById('scanInput');
+    const scanEntrega = document.getElementById('scanEntrega');
+    const scanField   = scanInput || scanEntrega;
     if (!scanField) { buf = ''; return; }
 
     const active = document.activeElement;
     const isOtherInput = active && active !== scanField &&
       (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT');
+
+    // Si hay otro input activo, dejamos que reciba normalmente.
     if (isOtherInput) { buf = ''; return; }
+
+    // Si el foco YA está en el campo de escaneo, dejamos que el listener local lo maneje.
     if (active === scanField) return;
 
     if (e.ctrlKey || e.altKey || e.metaKey) return;
@@ -1384,7 +1476,9 @@ async function wireInteligencia() {
       if (buf.length > 2) {
         scanField.value = buf.trim();
         scanField.focus();
+        // dispara input + keydown Enter para que el handler local procese
         scanField.dispatchEvent(new Event('input', { bubbles: true }));
+        scanField.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
       }
       buf = '';
       clearTimeout(timer);
@@ -1395,6 +1489,16 @@ async function wireInteligencia() {
       timer = setTimeout(() => { buf = ''; }, 300);
     }
   });
+
+  // Mantener foco en el campo de escaneo cuando estamos en una vista de escaneo
+  setInterval(() => {
+    const scanInput = document.getElementById('scanInput');
+    if (!scanInput) return;
+    const active = document.activeElement;
+    const isOtherInput = active && active !== scanInput &&
+      (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT' || active.tagName === 'BUTTON');
+    if (!isOtherInput && active !== scanInput) scanInput.focus();
+  }, 1500);
 }());
 
 // ─── LOGIN SCREEN ─────────────────────────────────────────────────────────────

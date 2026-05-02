@@ -928,13 +928,24 @@ function panelEscaneo(mode) {
   }
 
   return `<section class="panel">
-    <header class="panel-header"><h3>${VIEW_LABELS[isEnviar ? 'enviar_paquetes' : 'recibir_paquetes']}</h3></header>
-    <div class="scan-zone">
-      <h2>${isEnviar ? 'Modo escaneo de salida' : 'Modo recepción'}</h2>
-      <input id="scanInput" data-mode="${mode}" placeholder="Escanee o escriba guía/código de barras" autofocus />
+    <header class="panel-header">
+      <h3>${VIEW_LABELS[isEnviar ? 'enviar_paquetes' : 'recibir_paquetes']}</h3>
+      <span class="scan-counter-pill" id="scanCounterPill">0 escaneados</span>
+    </header>
+    <div class="scan-zone scan-zone-big" id="scanZone">
+      <div class="scan-icon">📡</div>
+      <h2>${isEnviar ? 'Modo escaneo de salida — continuo' : 'Modo recepción — continuo'}</h2>
+      <p class="scan-help">Apunte la pistola y dispare. <b>No tiene que mirar la pantalla.</b><br>Cada lectura suena un beep: <b>agudo</b> = OK, <b>grave</b> = error.</p>
+      <input id="scanInput" data-mode="${mode}" placeholder="Esperando escaneo…" autofocus />
       <p class="hint">Validación esperada: estado <b>${status}</b></p>
       <div id="scanFeedback" class="hint"></div>
+      <div class="scan-last" id="scanLast" style="display:none">
+        <div class="scan-last-status" id="scanLastStatus">—</div>
+        <div class="scan-last-guia" id="scanLastGuia">—</div>
+        <div class="scan-last-detail" id="scanLastDetail">—</div>
+      </div>
     </div>
+    <div id="scanFlash" class="scan-flash"></div>
     ${!isEnviar ? '<div class="table-wrap" id="scanTable" style="margin-top:.7rem"></div>' : ''}
   </section>
   ${despachadosPanel}

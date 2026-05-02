@@ -282,16 +282,26 @@ function htmlLabel(data) {
   const orig    = data.origen  || '';
   const barcode = data.codigo_barras || data.guia || '';
 
-  // Simulate a Code 128-style barcode as alternating thin/wide bars using CSS
-  // (real barcode font not available, but QZ Tray renders this fine on screen)
-  const barsHtml = (() => {
-    let bars = '';
-    for (let i = 0; i < barcode.length + 10; i++) {
-      const w = (i % 3 === 0) ? 3 : 1;
-      const fill = (i % 2 === 0) ? '#000' : '#fff';
-      bars += `<span style="display:inline-block;width:${w}px;height:28px;background:${fill};vertical-align:top"></span>`;
+  // Render REAL Code 128 barcode as SVG using JsBarcode.
+  // This produces a scanner-readable barcode that pistola lectoras can decode.
+  const barcodeSvg = (() => {
+    if (typeof window === 'undefined' || !window.JsBarcode) return '';
+    try {
+      const svgNS = 'http://www.w3.org/2000/svg';
+      const svgEl = document.createElementNS(svgNS, 'svg');
+      window.JsBarcode(svgEl, barcode, {
+        format: 'CODE128',
+        width: 2,
+        height: 70,
+        displayValue: false,
+        margin: 0,
+        background: '#ffffff',
+        lineColor: '#000000',
+      });
+      return new XMLSerializer().serializeToString(svgEl);
+    } catch (_) {
+      return '';
     }
-    return bars;
   })();
 
   return `<!DOCTYPE html>
@@ -314,9 +324,9 @@ function htmlLabel(data) {
                  color:#555; display:block; }
   .field.dest span { font-size:12pt; font-weight:900; line-height:1.2; }
   .field span { font-size:9pt; font-weight:700; display:block; line-height:1.2; }
-  .barwrap { border-top:1px solid #000; padding-top:2mm; text-align:center; }
-  .barcode { display:inline-flex; height:28px; gap:0; }
-  .barnum  { font-size:7pt; letter-spacing:1px; font-family:monospace; margin-top:1mm; }
+  .barwrap { border-top:1px solid #000; padding-top:3mm; text-align:center; }
+  .barwrap svg { height: 18mm; width: auto; max-width: 100%; }
+  .barnum  { font-size:9pt; letter-spacing:2px; font-family:monospace; margin-top:1mm; font-weight:700; }
 </style>
 </head><body>
 <div class="label">
@@ -339,7 +349,7 @@ function htmlLabel(data) {
     </div>
   </div>
   <div class="barwrap">
-    <div class="barcode">${barsHtml}</div>
+    ${barcodeSvg || `<div style="font-family:monospace;font-size:24pt;font-weight:900;letter-spacing:3px">${barcode}</div>`}
     <div class="barnum">${barcode}</div>
   </div>
 </div>
