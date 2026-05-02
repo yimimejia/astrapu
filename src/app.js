@@ -822,6 +822,8 @@ function wireEnvioForm() {
           fecha: new Date().toISOString(),
           bultos: paquetes.length,
           guias_extras: paquetes.length > 1 ? paquetes.slice(1).map((p) => p.guia) : [],
+          // Pasa todos los códigos de barra para imprimir uno por bulto en el ticket.
+          codigos_barras: paquetes.map((p) => p.codigo_barras),
         },
         { guia: paquetes[0].guia, destino: _dest, codigo_barras: paquetes[0].codigo_barras, bulto_index: paquetes[0].bulto_index, bulto_total: paquetes[0].bulto_total },
       );

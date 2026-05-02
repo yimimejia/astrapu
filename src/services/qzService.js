@@ -262,28 +262,46 @@ function escposTicket(data) {
     rAlign('Devuelta:', 'RD$ 0.00'),
     `${EQ}\n`,
 
-    // ── BARCODE (Code 128) — para que la factura sea escaneable con la pistola ──
+    // ── BARCODES (Code 128) — uno por bulto. Si vienen varios, se imprimen
+    //    todos para que la cajera pueda escanear cualquiera y validar el envío.
     // GS h n  : altura en dots (80 ≈ 10 mm)
     // GS w n  : ancho de módulo (2)
-    // GS H n  : posición HRI (2 = debajo del barcode)
+    // GS H n  : posición HRI (2 = debajo del barcode → imprime el código legible)
     // GS f n  : fuente HRI (0 = font A normal)
     // GS k 73 n d1..dn : Code 128 con prefijo de longitud. Datos comienzan con `{B`
     //                   para activar Code Set B (ASCII imprimible).
     CTR,
     (() => {
-      const code = String(data.codigo_barras || data.guia || '').slice(0, 80);
-      if (!code) return '';
-      const cb = `{B${code}`;
-      const len = String.fromCharCode(cb.length);
-      return '\x1D\x68\x50' + '\x1D\x77\x02' + '\x1D\x48\x02' + '\x1D\x66\x00'
-           + '\x1D\x6B\x49' + len + cb + '\n';
+      const codes = Array.isArray(data.codigos_barras) && data.codigos_barras.length
+        ? data.codigos_barras
+        : [data.codigo_barras || data.guia || ''];
+      const setup = '\x1D\x68\x50' + '\x1D\x77\x02' + '\x1D\x48\x02' + '\x1D\x66\x00';
+      return codes
+        .filter(Boolean)
+        .map((raw, idx) => {
+          const code = String(raw).slice(0, 80);
+          const cb = `{B${code}`;
+          const len = String.fromCharCode(cb.length);
+          const header = codes.length > 1 ? `Caja ${idx + 1}/${codes.length}\n` : '';
+          return header + setup + '\x1D\x6B\x49' + len + cb + '\n\n';
+        })
+        .join('');
     })(),
 
     // ── FOOTER ──
+    LEFT,
     `\n${msgFinal}\n`,
     NORMAL,
-    '\n\n',
-    '\x1D\x56\x41',                                // cut paper
+
+    // ── FEED + CUT ───────────────────────────────────────────────────────
+    // Avanza varias líneas para que el corte caiga DESPUÉS del último texto
+    // (la cuchilla está ~10-20 mm por encima del cabezal en la mayoría de
+    // las térmicas de 80 mm).
+    '\x1B\x64\x06',                                // ESC d 6 → feed 6 lines
+    // GS V B 0 → corte parcial (Function B). Es el comando de corte más
+    // compatible entre marcas (Epson, Bixolon, Xprinter, Star, etc.).
+    // Si la cuchilla soporta corte total, también lo ejecuta.
+    '\x1D\x56\x42\x00',
   ].join('');
 }
 
